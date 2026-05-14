@@ -12,9 +12,14 @@ router.get('/', async (req, res) => {
       sql += ' WHERE requester_name ILIKE $1 OR requester_email ILIKE $1 OR request_type ILIKE $1';
       params = [`%${search}%`];
     }
-    sql += ' ORDER BY created_at DESC';
-    const result = await query(sql, params);
-    res.json(result.rows);
+    const pageNum = Math.max(1, parseInt(req.query.page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const countSql = 'SELECT COUNT(*) FROM data_subject_requests' + (search ? ' WHERE requester_name ILIKE $1 OR request_type ILIKE $1' : '');
+    const countParams = search ? ['%' + search + '%'] : [];
+    sql += ' LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    params.push(limitNum, (pageNum - 1) * limitNum);
+    const [countResult, result] = await Promise.all([query(countSql, countParams), query(sql, params)]);
+    res.json({ data: result.rows, total: parseInt(countResult.rows[0].count), page: pageNum, limit: limitNum });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

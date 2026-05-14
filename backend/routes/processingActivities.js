@@ -6,15 +6,23 @@ const authMiddleware = require('../middleware/auth');
 router.get('/', async (req, res) => {
   try {
     const { search } = req.query;
-    let sql = 'SELECT * FROM processing_activities';
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    let whereClause = '';
     let params = [];
     if (search) {
-      sql += ' WHERE activity_name ILIKE $1 OR purpose ILIKE $1 OR department ILIKE $1';
+      whereClause = ' WHERE activity_name ILIKE $1 OR purpose ILIKE $1 OR department ILIKE $1';
       params = [`%${search}%`];
     }
-    sql += ' ORDER BY created_at DESC';
-    const result = await query(sql, params);
-    res.json(result.rows);
+
+    const [countRes, dataRes] = await Promise.all([
+      query(`SELECT COUNT(*) FROM processing_activities${whereClause}`, params),
+      query(`SELECT * FROM processing_activities${whereClause} ORDER BY created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`, [...params, limit, offset]),
+    ]);
+    const total = parseInt(countRes.rows[0].count);
+    res.json({ data: dataRes.rows, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

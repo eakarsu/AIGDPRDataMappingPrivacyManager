@@ -5,6 +5,24 @@ import { authService, createCrudService, aiService } from './services/api';
 import Dashboard from './components/Dashboard';
 import CrudPage from './components/CrudPage';
 import AIInsights from './components/AIInsights';
+import AIAdvancedTools from './components/AIAdvancedTools';
+import CustomFeatures from './components/CustomFeatures';
+import RegulatoryAndLLM from './components/RegulatoryAndLLM';
+
+// === Batch 04 Gaps & Frontend Mounts ===
+import CfAgenticComplianceAuditorContinuously from './pages/CfAgenticComplianceAuditorContinuously';
+import CfLlmfoundationModelUsageScannerExtend from './pages/CfLlmfoundationModelUsageScannerExtend';
+import CfVendorSupplyChainVisibilityMapping2 from './pages/CfVendorSupplyChainVisibilityMapping2';
+import CfConsentBannerAbTesterRecommendingVa from './pages/CfConsentBannerAbTesterRecommendingVa';
+import CfRegulatoryChangeTrackerAutoGeneratin from './pages/CfRegulatoryChangeTrackerAutoGeneratin';
+import CfAdaptiveWorkforcePrivacyTrainingPlat from './pages/CfAdaptiveWorkforcePrivacyTrainingPlat';
+import GapNoThirdPartyCodeSdkAudit from './pages/GapNoThirdPartyCodeSdkAudit';
+import GapNoRecommendationEngineBiasCheck from './pages/GapNoRecommendationEngineBiasCheck';
+import GapNoAutomatedDpaContractTemplateGener from './pages/GapNoAutomatedDpaContractTemplateGener';
+import GapNoAutomatedDsrFulfillmentDataExport from './pages/GapNoAutomatedDsrFulfillmentDataExport';
+import GapNoRealTimeDataFlowMonitoring from './pages/GapNoRealTimeDataFlowMonitoring';
+import GapLimitedWebhookSurfaceNoWebhookKeywo from './pages/GapLimitedWebhookSurfaceNoWebhookKeywo';
+import GapNoPublicFacingPrivacyPortalFor from './pages/GapNoPublicFacingPrivacyPortalFor';
 
 const FEATURES = {
   'processing-activities': { title: 'Processing Activities (ROPA)', endpoint: 'processing-activities', icon: '📋', color: '#6c5ce7' },
@@ -298,8 +316,10 @@ function App() {
     );
   }
 
-  const isAIPage = currentPage.startsWith('ai-');
+  const isAIAdvancedPage = currentPage.startsWith('aix-');
+  const isAIPage = !isAIAdvancedPage && currentPage.startsWith('ai-');
   const isCrudPage = FEATURES[currentPage];
+  const isCustomFeaturePage = currentPage.startsWith('cf-');
 
   return (
     <div className="app-layout">
@@ -380,6 +400,47 @@ function App() {
           </div>
         </div>
 
+        <div className="sidebar-section">
+          <div className="sidebar-section-title">Advanced AI Tools</div>
+          <div className={`sidebar-item ${currentPage === 'aix-audit-third-party-code' ? 'active' : ''}`} onClick={() => navigate('aix-audit-third-party-code')}>
+            🔌 Third-party Code Audit
+          </div>
+          <div className={`sidebar-item ${currentPage === 'aix-recommendation-engine-bias-check' ? 'active' : ''}`} onClick={() => navigate('aix-recommendation-engine-bias-check')}>
+            ⚖️ Recommender Bias Check
+          </div>
+          <div className={`sidebar-item ${currentPage === 'aix-dsr-fulfillment-plan' ? 'active' : ''}`} onClick={() => navigate('aix-dsr-fulfillment-plan')}>
+            📤 DSR Fulfillment Plan
+          </div>
+          <div className={`sidebar-item ${currentPage === 'aix-dpa-template-generate' ? 'active' : ''}`} onClick={() => navigate('aix-dpa-template-generate')}>
+            📄 DPA Template
+          </div>
+          <div className={`sidebar-item ${currentPage === 'aix-pii-rbac-recommend' ? 'active' : ''}`} onClick={() => navigate('aix-pii-rbac-recommend')}>
+            🔐 PII RBAC Matrix
+          </div>
+        </div>
+
+        <div className="sidebar-section">
+          <div className="sidebar-section-title">Advanced Features</div>
+          <div className={`sidebar-item ${currentPage === 'cf-cookie-scanner' ? 'active' : ''}`} onClick={() => navigate('cf-cookie-scanner')}>
+            🔎 Cookie Scanner
+          </div>
+          <div className={`sidebar-item ${currentPage === 'cf-dsr-fulfillment' ? 'active' : ''}`} onClick={() => navigate('cf-dsr-fulfillment')}>
+            📦 DSR Fulfillment
+          </div>
+          <div className={`sidebar-item ${currentPage === 'cf-breach-countdown' ? 'active' : ''}`} onClick={() => navigate('cf-breach-countdown')}>
+            ⏱️ Breach 72h Countdown
+          </div>
+          <div className={`sidebar-item ${currentPage === 'cf-vendor-calendar' ? 'active' : ''}`} onClick={() => navigate('cf-vendor-calendar')}>
+            📅 Vendor Calendar
+          </div>
+          <div className={`sidebar-item ${currentPage === 'cf-policy-rag' ? 'active' : ''}`} onClick={() => navigate('cf-policy-rag')}>
+            📚 Policy Corpus RAG
+          </div>
+          <div className={`sidebar-item ${currentPage === 'regulatory-and-llm' ? 'active' : ''}`} onClick={() => navigate('regulatory-and-llm')}>
+            🌐 Regulatory & LLM Registry
+          </div>
+        </div>
+
         <div className="sidebar-user">
           <div className="sidebar-user-info">
             <div className="sidebar-user-avatar">{user.full_name?.charAt(0)}</div>
@@ -396,6 +457,9 @@ function App() {
         {currentPage === 'dashboard' && (
           <Dashboard features={FEATURES} onNavigate={navigate} />
         )}
+        {currentPage === 'regulatory-and-llm' && (
+          <RegulatoryAndLLM />
+        )}
         {isCrudPage && (
           <CrudPage
             key={currentPage}
@@ -407,6 +471,15 @@ function App() {
         )}
         {isAIPage && (
           <AIInsights aiService={aiService} onBack={() => navigate('dashboard')} initialTab={currentPage} />
+        )}
+        {isAIAdvancedPage && (
+          <AIAdvancedTools onBack={() => navigate('dashboard')} initialTab={currentPage.replace('aix-', '')} />
+        )}
+        {isCustomFeaturePage && (
+          <CustomFeatures
+            initialTab={currentPage.replace('cf-', '')}
+            onBack={() => navigate('dashboard')}
+          />
         )}
       </main>
 

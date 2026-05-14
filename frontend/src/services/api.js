@@ -61,6 +61,39 @@ export const aiService = {
   auditCookies: (data) => api.post('/ai/audit-cookies', data),
   evaluateTransfer: (data) => api.post('/ai/evaluate-transfer', data),
   recommendTraining: (data) => api.post('/ai/recommend-training', data),
+  // New AI Tools (audit-third-party-code & recommendation-engine-bias-check)
+  auditThirdPartyCode: (data) => api.post('/ai/audit-third-party-code', data),
+  checkRecommendationBias: (data) => api.post('/ai/recommendation-engine-bias-check', data),
+  // Apply pass 4 - mechanical backlog
+  dsrFulfillmentPlan: (data) => api.post('/ai/dsr-fulfillment-plan', data),
+  dpaTemplateGenerate: (data) => api.post('/ai/dpa-template-generate', data),
+  piiRbacRecommend: (data) => api.post('/ai/pii-rbac-recommend', data),
+};
+
+// Custom non-CRUD feature endpoints (5 new per audit)
+export const customService = {
+  // 1. Cookie scanner
+  cookieScannerScan: (data) => api.post('/cookie-scanner/scan', data),
+  cookieScannerHistory: (params) => api.get('/cookie-scanner/history', { params }),
+  // 2. DSR fulfillment
+  dsrFulfillmentGenerate: (data) => api.post('/dsr-fulfillment/generate', data),
+  dsrFulfillmentList: (params) => api.get('/dsr-fulfillment/dossiers', { params }),
+  // 3. Breach 72h countdown
+  breachCountdownRegister: (data) => api.post('/breach-countdown/register', data),
+  breachCountdownList: () => api.get('/breach-countdown'),
+  // 4. Vendor renewal/audit calendar
+  vendorCalendarSync: () => api.post('/vendor-calendar/sync'),
+  vendorCalendarRecommend: (data) => api.post('/vendor-calendar/recommend', data),
+  vendorCalendarList: () => api.get('/vendor-calendar'),
+  // 5. Policy corpus RAG
+  policyCorpusUpload: (data) => api.post('/policy-corpus', data),
+  policyCorpusList: (params) => api.get('/policy-corpus', { params }),
+  policyCorpusQuery: (data) => api.post('/policy-corpus/query', data),
+  // Misc
+  aiHistory: (params) => api.get('/ai-history', { params }),
+  auditLog: (params) => api.get('/audit-log', { params }),
+  complianceHealth: () => api.get('/compliance-health'),
+  dsrDeadlines: () => api.get('/dsr-deadlines'),
 };
 
 export default api;

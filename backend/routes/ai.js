@@ -4,10 +4,17 @@ const fetch = require('node-fetch');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 
+const { query } = require('../db');
+const authMiddleware = require('../middleware/auth');
+
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-haiku-4.5';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
+
+// Enforce auth on all AI routes
+router.use(authMiddleware);
 
 async function callOpenRouter(messages) {
+  if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -30,7 +37,19 @@ async function callOpenRouter(messages) {
   }
 
   const data = await response.json();
-  return data.choices[0].message.content;
+  return { content: data.choices[0].message.content, model: data.model || OPENROUTER_MODEL };
+}
+
+// Persist AI result to DB
+async function saveAiResult(userId, toolName, entityType, entityId, inputSnapshot, result, model) {
+  try {
+    await query(
+      'INSERT INTO ai_analysis_results (user_id, tool_name, entity_type, entity_id, input_snapshot, result, model) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [userId, toolName, entityType || null, entityId || null, JSON.stringify(inputSnapshot), JSON.stringify(result), model]
+    );
+  } catch (err) {
+    console.error('Failed to save AI result:', err.message);
+  }
 }
 
 function parseAIResponse(content) {
@@ -52,7 +71,7 @@ function parseAIResponse(content) {
 // 1. AI Privacy Risk Assessment
 router.post('/risk-assessment', async (req, res) => {
   try {
-    const { activity_name, processing_description, data_categories, data_subjects, legal_basis } = req.body;
+    const { activity_name, processing_description, data_categories, data_subjects, legal_basis, activity_id } = req.body;
     if (!processing_description) {
       return res.status(400).json({ error: 'Processing description is required' });
     }
@@ -78,8 +97,10 @@ router.post('/risk-assessment', async (req, res) => {
 }` },
       { role: 'user', content: `Assess the privacy risks for this processing activity:\nActivity: ${activity_name || 'Not specified'}\nProcessing Description: ${processing_description}\nData Categories: ${data_categories || 'Not specified'}\nData Subjects: ${data_subjects || 'Not specified'}\nLegal Basis: ${legal_basis || 'Not specified'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content, model } = await callOpenRouter(messages);
+    const parsed = parseAIResponse(content);
+    await saveAiResult(req.user.id, 'risk-assessment', 'processing_activity', activity_id || null, { activity_name, processing_description, data_categories }, parsed, model);
+    res.json({ success: true, data: parsed });
   } catch (err) {
     console.error('Risk assessment error:', err);
     res.status(500).json({ error: err.message });
@@ -114,8 +135,10 @@ router.post('/dpia-generate', async (req, res) => {
 }` },
       { role: 'user', content: `Generate a DPIA for:\nProject: ${project_name}\nProcessing: ${processing_description}\nData Categories: ${data_categories || 'Not specified'}\nPurpose: ${purpose || 'Not specified'}\nData Subjects: ${data_subjects || 'Not specified'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     console.error('DPIA generation error:', err);
     res.status(500).json({ error: err.message });
@@ -146,8 +169,10 @@ router.post('/compliance-gap', async (req, res) => {
 }` },
       { role: 'user', content: `Analyze compliance gaps:\nRegulation: ${regulation || 'GDPR'}\nOrganization Type: ${organization_type || 'Not specified'}\nCurrent Practices: ${current_practices}\nProcessing Activities: ${data_processing_activities || 'Not specified'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -173,8 +198,10 @@ router.post('/classify-data', async (req, res) => {
 }` },
       { role: 'user', content: `Classify these data fields:\nFields: ${data_fields}\nContext: ${context || 'Not specified'}\nSample Values: ${sample_values || 'Not provided'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -202,8 +229,10 @@ router.post('/breach-response', async (req, res) => {
 }` },
       { role: 'user', content: `Generate a breach response plan:\nBreach Type: ${breach_type || 'Not specified'}\nDescription: ${description}\nData Affected: ${data_affected || 'Not specified'}\nIndividuals Affected: ${number_of_individuals || 'Unknown'}\nSeverity: ${severity || 'Not assessed'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -230,8 +259,10 @@ router.post('/generate-policy', async (req, res) => {
 }` },
       { role: 'user', content: `Generate a ${policy_type} policy:\nOrganization: ${organization_name || '[Organization Name]'}\nOrganization Type: ${organization_type || 'Not specified'}\nJurisdiction: ${jurisdiction || 'EU/EEA'}\nSpecific Requirements: ${specific_requirements || 'Standard GDPR compliance'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -260,8 +291,10 @@ router.post('/analyze-activity', async (req, res) => {
 }` },
       { role: 'user', content: `Analyze this processing activity for GDPR compliance:\nActivity: ${activity_name}\nPurpose: ${purpose || 'Not specified'}\nLegal Basis: ${legal_basis || 'Not specified'}\nData Categories: ${data_categories || 'Not specified'}\nData Subjects: ${data_subjects || 'Not specified'}\nRecipients: ${recipients || 'Not specified'}\nRetention Period: ${retention_period || 'Not specified'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -299,8 +332,10 @@ router.post('/draft-dsr-response', async (req, res) => {
 }` },
       { role: 'user', content: `Draft a response for this data subject request:\nRequest Type: ${request_type}\nRequester: ${requester_name}\nDescription: ${description || 'Standard request'}\nData Categories: ${data_categories_affected || 'Not specified'}\nCurrent Status: ${status || 'pending'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -325,8 +360,10 @@ router.post('/dpia-advice', async (req, res) => {
 }` },
       { role: 'user', content: `Review this DPIA:\nAssessment: ${assessment_name}\nProject: ${project_name || 'Not specified'}\nProcessing: ${processing_description || 'Not specified'}\nIdentified Risks: ${identified_risks || 'Not specified'}\nRisk Level: ${risk_level || 'Not assessed'}\nStatus: ${status || 'draft'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -363,8 +400,10 @@ router.post('/optimize-consent', async (req, res) => {
 }` },
       { role: 'user', content: `Analyze and optimize this consent:\nConsent Type: ${consent_type}\nPurpose: ${purpose || 'Not specified'}\nCurrent Consent Text: ${consent_text || 'Not provided'}\nCollection Method: ${collection_method || 'Not specified'}\nGranularity: ${granularity || 'Not specified'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -396,8 +435,10 @@ router.post('/analyze-breach', async (req, res) => {
 }` },
       { role: 'user', content: `Analyze this breach incident:\nTitle: ${incident_title}\nDescription: ${description || 'Not specified'}\nBreach Type: ${breach_type || 'Not specified'}\nSeverity: ${severity || 'Not assessed'}\nData Categories: ${data_categories_affected || 'Not specified'}\nIndividuals Affected: ${number_of_individuals || 'Unknown'}\nRoot Cause: ${root_cause || 'Under investigation'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -427,8 +468,10 @@ router.post('/assess-vendor', async (req, res) => {
 }` },
       { role: 'user', content: `Assess this vendor:\nVendor: ${vendor_name}\nType: ${vendor_type || 'Not specified'}\nCountry: ${country || 'Not specified'}\nServices: ${services_provided || 'Not specified'}\nData Shared: ${data_categories_shared || 'Not specified'}\nDPA Signed: ${dpa_signed || 'Unknown'}\nSCC in Place: ${scc_in_place || 'Unknown'}\nCertifications: ${certifications || 'None specified'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -453,8 +496,10 @@ router.post('/retention-advice', async (req, res) => {
 }` },
       { role: 'user', content: `Advise on data retention:\nData Category: ${data_category}\nCurrent Retention: ${current_retention_period || 'Not defined'}\nLegal Basis: ${legal_basis || 'Not specified'}\nDepartment: ${department || 'Not specified'}\nRegulatory Requirements: ${regulatory_requirement || 'Not specified'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -492,8 +537,10 @@ router.post('/audit-cookies', async (req, res) => {
 }` },
       { role: 'user', content: `Audit cookie compliance for:\nDomain: ${domain}\nCookies: ${cookies_description || 'Not specified'}\nConsent Mechanism: ${consent_mechanism || 'Not specified'}\nCountry Scope: ${country_scope || 'EU'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -533,8 +580,10 @@ router.post('/evaluate-transfer', async (req, res) => {
 }` },
       { role: 'user', content: `Evaluate this cross-border transfer:\nFrom: ${source_country || 'EU/EEA'}\nTo: ${destination_country}\nData Categories: ${data_categories || 'Not specified'}\nTransfer Mechanism: ${transfer_mechanism || 'Not specified'}\nRecipient: ${recipient_name || 'Not specified'}\nRecipient Type: ${recipient_type || 'Not specified'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -568,8 +617,307 @@ router.post('/recommend-training', async (req, res) => {
 }` },
       { role: 'user', content: `Recommend privacy training for:\nRole: ${employee_role || 'Not specified'}\nDepartment: ${department || 'Not specified'}\nCurrent Training: ${current_training || 'None completed'}\nKnown Compliance Gaps: ${compliance_gaps || 'General GDPR awareness needed'}` }
     ];
-    const aiResponse = await callOpenRouter(messages);
-    res.json({ success: true, data: parseAIResponse(aiResponse) });
+    const { content: aiContent, model: aiModel } = await callOpenRouter(messages);
+    const parsedResult = parseAIResponse(aiContent);
+    await saveAiResult(req.user?.id, req.route?.path?.replace("/","") || "unknown", null, null, req.body, parsedResult, aiModel);
+    res.json({ success: true, data: parsedResult });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 17. Audit third-party code — scan SDK / library list for unauthorized tracking
+router.post('/audit-third-party-code', async (req, res) => {
+  try {
+    const { sdks_libraries = [], app_or_site_url, region = 'EU' } = req.body || {};
+    if (!Array.isArray(sdks_libraries) || sdks_libraries.length === 0) {
+      return res.status(400).json({ error: 'sdks_libraries array required (e.g., [{ name, version, declared_purpose }])' });
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a privacy engineer auditing third-party SDKs and libraries for unauthorized data exfiltration, undisclosed tracking, and GDPR/ePrivacy violations. Return STRICT JSON only:
+{
+  "summary": "<exec summary>",
+  "overall_risk": "low|medium|high",
+  "findings": [
+    {
+      "library": "<name@version>",
+      "data_collected": ["..."],
+      "transmits_to": ["domain1", "..."],
+      "consent_required": true,
+      "violations": ["..."],
+      "severity": "low|medium|high",
+      "recommended_action": "remove|configure|replace|negotiate_dpa"
+    }
+  ],
+  "recommendations": ["..."],
+  "monitoring_setup": ["CSP report-only", "browser network audit", "..."],
+  "disclaimer": "Manual code review still required for completeness."
+}`
+      },
+      {
+        role: 'user',
+        content: `Region: ${region}
+App/Site URL: ${app_or_site_url || 'not provided'}
+Third-party libraries:
+${JSON.stringify(sdks_libraries, null, 2)}
+
+Audit each. Flag any known surveillance SDKs (Facebook Pixel, Google Analytics 3, TikTok pixel, Meta CAPI, etc.) and unauthorized data transfers outside the EEA.`
+      },
+    ];
+
+    const { content, model } = await callOpenRouter(messages);
+    const parsed = parseAIResponse(content);
+    await saveAiResult(req.user?.id, 'audit-third-party-code', null, null, req.body, parsed, model);
+    res.json({ success: true, data: parsed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 18. Recommendation engine bias check
+router.post('/recommendation-engine-bias-check', async (req, res) => {
+  try {
+    const {
+      system_description,
+      protected_attributes = ['gender', 'age', 'race', 'religion'],
+      training_data_summary,
+      sample_outcomes = [],
+      use_case,
+    } = req.body || {};
+    if (!system_description) {
+      return res.status(400).json({ error: 'system_description is required' });
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are an AI fairness auditor. Audit a recommendation engine for discriminatory bias against protected attributes (GDPR Art. 22 + EU AI Act). Return STRICT JSON only:
+{
+  "summary": "<exec summary>",
+  "bias_findings": [
+    {
+      "attribute": "<protected attr>",
+      "evidence": "string",
+      "severity": "low|medium|high",
+      "metric_suggested": "demographic_parity|equal_opportunity|disparate_impact",
+      "remediation": ["..."]
+    }
+  ],
+  "feedback_loop_risks": ["filter bubbles", "..."],
+  "fairness_metrics_to_track": ["..."],
+  "documentation_to_produce": ["model card", "data sheet for datasets", "..."],
+  "regulatory_alignment": { "gdpr_art_22": "compliant|partial|non_compliant", "eu_ai_act": "compliant|partial|non_compliant" },
+  "disclaimer": "Quantitative audit still requires statistical tests on real outputs."
+}`
+      },
+      {
+        role: 'user',
+        content: `System: ${system_description}
+Use case: ${use_case || 'unspecified'}
+Protected attributes: ${JSON.stringify(protected_attributes)}
+Training data summary: ${training_data_summary || 'unspecified'}
+Sample outcomes: ${JSON.stringify(sample_outcomes)}`
+      },
+    ];
+
+    const { content, model } = await callOpenRouter(messages);
+    const parsed = parseAIResponse(content);
+    await saveAiResult(req.user?.id, 'recommendation-engine-bias-check', null, null, req.body, parsed, model);
+    res.json({ success: true, data: parsed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// Apply pass 4 — mechanical backlog
+// ============================================================
+
+// 19. Automated DSR fulfillment plan (data export + anonymization plan)
+router.post('/dsr-fulfillment-plan', async (req, res) => {
+  try {
+    if (!OPENROUTER_API_KEY) {
+      return res.status(503).json({ error: 'OPENROUTER_API_KEY not configured' });
+    }
+    const {
+      request_type = 'access',
+      data_subject_description,
+      systems_in_scope = [],
+      data_categories = [],
+      jurisdiction = 'EU/EEA',
+    } = req.body || {};
+    if (!data_subject_description) {
+      return res.status(400).json({ error: 'data_subject_description is required' });
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a GDPR Data Subject Rights fulfillment planner. Produce a step-by-step automated fulfillment plan for the requested DSR (access | erasure | rectification | portability | restrict | object). Return STRICT JSON only:
+{
+  "request_type": "access|erasure|rectification|portability|restrict|object",
+  "deadline_days": 30,
+  "data_locations_to_query": [
+    { "system": "string", "table_or_dataset": "string", "lookup_key": "string", "expected_volume": "string" }
+  ],
+  "export_format": "json|csv|pdf|machine_readable",
+  "anonymization_steps": [
+    { "field": "string", "method": "hash|truncate|generalize|suppress|tokenize", "rationale": "string" }
+  ],
+  "redaction_rules": ["..."],
+  "verification_steps": ["identity verification", "..."],
+  "third_party_notifications": ["processor X via API ...", "..."],
+  "audit_log_entries": ["..."],
+  "response_letter_outline": "string",
+  "risk_flags": ["risk of re-identification on field X", "..."]
+}`
+      },
+      {
+        role: 'user',
+        content: `Request type: ${request_type}
+Jurisdiction: ${jurisdiction}
+Data subject context: ${data_subject_description}
+Systems in scope: ${JSON.stringify(systems_in_scope)}
+Data categories: ${JSON.stringify(data_categories)}`
+      },
+    ];
+
+    const { content, model } = await callOpenRouter(messages);
+    const parsed = parseAIResponse(content);
+    await saveAiResult(req.user?.id, 'dsr-fulfillment-plan', null, null, req.body, parsed, model);
+    res.json({ success: true, data: parsed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 20. DPA / processor contract template generation
+router.post('/dpa-template-generate', async (req, res) => {
+  try {
+    if (!OPENROUTER_API_KEY) {
+      return res.status(503).json({ error: 'OPENROUTER_API_KEY not configured' });
+    }
+    const {
+      controller_name,
+      processor_name,
+      processing_purpose,
+      data_categories = [],
+      data_subjects = [],
+      sub_processors_allowed = false,
+      transfer_outside_eea = false,
+      jurisdiction = 'EU',
+    } = req.body || {};
+    if (!controller_name || !processor_name || !processing_purpose) {
+      return res.status(400).json({ error: 'controller_name, processor_name and processing_purpose are required' });
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a GDPR contracts expert. Generate a Data Processing Agreement (DPA) template aligned with GDPR Art. 28 + EU SCCs (2021/914) where transfers apply. Return STRICT JSON only:
+{
+  "title": "string",
+  "preamble": "string",
+  "definitions": [{"term":"string","definition":"string"}],
+  "subject_matter": "string",
+  "duration": "string",
+  "nature_and_purpose": "string",
+  "data_categories": ["..."],
+  "data_subjects": ["..."],
+  "controller_obligations": ["..."],
+  "processor_obligations": ["confidentiality", "Art.32 security", "..."],
+  "sub_processor_clause": "string",
+  "international_transfer_clause": "string",
+  "audit_rights_clause": "string",
+  "breach_notification_clause": "string",
+  "deletion_or_return_clause": "string",
+  "annexes": [
+    {"name":"Annex I — Description of Processing","content":"string"},
+    {"name":"Annex II — Technical and Organisational Measures","content":"string"}
+  ],
+  "signature_block": "string",
+  "disclaimer": "Template only — review by qualified counsel required."
+}`
+      },
+      {
+        role: 'user',
+        content: `Controller: ${controller_name}
+Processor: ${processor_name}
+Purpose: ${processing_purpose}
+Jurisdiction: ${jurisdiction}
+Data categories: ${JSON.stringify(data_categories)}
+Data subjects: ${JSON.stringify(data_subjects)}
+Sub-processors allowed: ${sub_processors_allowed}
+Transfer outside EEA: ${transfer_outside_eea}`
+      },
+    ];
+
+    const { content, model } = await callOpenRouter(messages);
+    const parsed = parseAIResponse(content);
+    await saveAiResult(req.user?.id, 'dpa-template-generate', null, null, req.body, parsed, model);
+    res.json({ success: true, data: parsed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 21. Role-based PII access control recommendation
+router.post('/pii-rbac-recommend', async (req, res) => {
+  try {
+    if (!OPENROUTER_API_KEY) {
+      return res.status(503).json({ error: 'OPENROUTER_API_KEY not configured' });
+    }
+    const {
+      organization_description,
+      roles = [],
+      datasets_with_pii = [],
+      sensitivity_overview,
+    } = req.body || {};
+    if (!organization_description || roles.length === 0) {
+      return res.status(400).json({ error: 'organization_description and at least one role are required' });
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a privacy engineering / IAM advisor. Produce a least-privilege role-based access control matrix for PII datasets per GDPR Art. 5(1)(f) and Art. 32. Return STRICT JSON only:
+{
+  "rbac_matrix": [
+    {
+      "role": "string",
+      "dataset": "string",
+      "permission": "none|view_masked|view_full|edit|delete|export",
+      "justification": "string",
+      "mfa_required": true,
+      "approval_workflow": "auto|manager|dpo|none"
+    }
+  ],
+  "row_level_rules": ["region-scoped access for support agents", "..."],
+  "field_level_masking": [
+    {"field":"string","mask_for_roles":["..."],"method":"hash|partial|tokenize|redact"}
+  ],
+  "monitoring_recommendations": ["query auditing on view_full of HR dataset", "..."],
+  "review_cadence": "quarterly|monthly|annual",
+  "training_recommendations": ["..."],
+  "compliance_notes": ["GDPR Art. 5(1)(f)", "Art. 25 by-design", "..."]
+}`
+      },
+      {
+        role: 'user',
+        content: `Organization: ${organization_description}
+Roles: ${JSON.stringify(roles)}
+Datasets with PII: ${JSON.stringify(datasets_with_pii)}
+Sensitivity overview: ${sensitivity_overview || 'not provided'}`
+      },
+    ];
+
+    const { content, model } = await callOpenRouter(messages);
+    const parsed = parseAIResponse(content);
+    await saveAiResult(req.user?.id, 'pii-rbac-recommend', null, null, req.body, parsed, model);
+    res.json({ success: true, data: parsed });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
