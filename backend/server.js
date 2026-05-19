@@ -632,6 +632,9 @@ app.use('/api/gap-no-real-time-data-flow-monitoring', route_gap_no_real_time_dat
 app.use('/api/gap-limited-webhook-surface-no-webhook-keywo', route_gap_limited_webhook_surface_no_webhook_keywo);
 app.use('/api/gap-no-public-facing-privacy-portal-for', route_gap_no_public_facing_privacy_portal_for);
 
+// Custom Views (2 VIZ + 2 NON-VIZ) — mounted BEFORE implicit 404 handler
+app.use('/api/custom-views', require('./routes/customViews'));
+
 app.listen(PORT, () => {
   console.log(`GDPR Privacy Manager Backend running on port ${PORT}`);
 });

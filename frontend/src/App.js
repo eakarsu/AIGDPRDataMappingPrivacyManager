@@ -23,6 +23,7 @@ import GapNoAutomatedDsrFulfillmentDataExport from './pages/GapNoAutomatedDsrFul
 import GapNoRealTimeDataFlowMonitoring from './pages/GapNoRealTimeDataFlowMonitoring';
 import GapLimitedWebhookSurfaceNoWebhookKeywo from './pages/GapLimitedWebhookSurfaceNoWebhookKeywo';
 import GapNoPublicFacingPrivacyPortalFor from './pages/GapNoPublicFacingPrivacyPortalFor';
+import CustomViewsPage from './pages/CustomViewsPage';
 
 const FEATURES = {
   'processing-activities': { title: 'Processing Activities (ROPA)', endpoint: 'processing-activities', icon: '📋', color: '#6c5ce7' },
@@ -439,6 +440,9 @@ function App() {
           <div className={`sidebar-item ${currentPage === 'regulatory-and-llm' ? 'active' : ''}`} onClick={() => navigate('regulatory-and-llm')}>
             🌐 Regulatory & LLM Registry
           </div>
+          <div data-testid="sidebar-custom-views" className={`sidebar-item ${currentPage === 'custom-views' ? 'active' : ''}`} onClick={() => navigate('custom-views')}>
+            🛡️ GDPR Views
+          </div>
         </div>
 
         <div className="sidebar-user">
@@ -459,6 +463,9 @@ function App() {
         )}
         {currentPage === 'regulatory-and-llm' && (
           <RegulatoryAndLLM />
+        )}
+        {currentPage === 'custom-views' && (
+          <CustomViewsPage />
         )}
         {isCrudPage && (
           <CrudPage
