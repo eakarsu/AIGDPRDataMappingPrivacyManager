@@ -161,8 +161,8 @@ app.get('/api/compliance-health', authMiddleware, async (req, res) => {
       query("SELECT AVG(CASE risk_level WHEN 'low' THEN 90 WHEN 'medium' THEN 65 WHEN 'high' THEN 35 WHEN 'critical' THEN 10 ELSE 50 END) as score FROM processing_activities WHERE status = 'active'"),
       query("SELECT COUNT(*) as open FROM data_breaches WHERE status NOT IN ('resolved','closed')"),
       query("SELECT AVG(CASE risk_level WHEN 'low' THEN 90 WHEN 'medium' THEN 65 WHEN 'high' THEN 35 ELSE 50 END) as score FROM vendors"),
-      query("SELECT AVG(CASE WHEN certified = true THEN 90 ELSE 30 END) as score FROM training_records WHERE expiry_date > NOW() OR expiry_date IS NULL"),
-      query("SELECT COUNT(*) as overdue FROM data_subject_requests WHERE status NOT IN ('completed','rejected') AND deadline < NOW()"),
+      query("SELECT AVG(CASE WHEN passed = true THEN 90 ELSE 30 END) as score FROM training_records WHERE expiry_date > NOW() OR expiry_date IS NULL"),
+      query("SELECT COUNT(*) as overdue FROM data_subject_requests WHERE status NOT IN ('completed','rejected') AND due_date < NOW()"),
     ]);
     const activityScore = parseFloat(activities.rows[0]?.score) || 70;
     const vendorScore = parseFloat(vendors.rows[0]?.score) || 70;
@@ -214,14 +214,14 @@ app.get('/api/dsr-deadlines', authMiddleware, async (req, res) => {
   try {
     const result = await query(`
       SELECT *,
-        EXTRACT(EPOCH FROM (deadline - NOW())) / 86400 as days_remaining,
-        CASE WHEN deadline < NOW() THEN 'overdue'
-             WHEN deadline < NOW() + INTERVAL '7 days' THEN 'urgent'
-             WHEN deadline < NOW() + INTERVAL '30 days' THEN 'upcoming'
+        EXTRACT(EPOCH FROM (due_date - NOW())) / 86400 as days_remaining,
+        CASE WHEN due_date < NOW() THEN 'overdue'
+             WHEN due_date < NOW() + INTERVAL '7 days' THEN 'urgent'
+             WHEN due_date < NOW() + INTERVAL '30 days' THEN 'upcoming'
              ELSE 'on_track' END as urgency
       FROM data_subject_requests
       WHERE status NOT IN ('completed','rejected')
-      ORDER BY deadline ASC
+      ORDER BY due_date ASC
     `);
     res.json({
       requests: result.rows,
@@ -622,6 +622,7 @@ app.use('/api/llm-usage-registry', authMiddleware, require('./routes/llmUsageReg
 app.use('/api/ai', aiLimiter, require('./routes/ai'));
 app.use('/api/agentic-compliance-auditor', require('./routes/agenticComplianceAuditor'));
 app.use('/api/vendor-supply-chain', require('./routes/vendorSupplyChainVisibility'));
+app.use('/api/transfer-impact-assessment-queue', authMiddleware, require('./routes/transferImpactAssessmentQueue'));
 
 
 app.use('/api/gap-no-third-party-code-sdk-audit', route_gap_no_third_party_code_sdk_audit);

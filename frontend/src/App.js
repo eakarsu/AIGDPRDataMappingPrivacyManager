@@ -24,6 +24,7 @@ import GapNoRealTimeDataFlowMonitoring from './pages/GapNoRealTimeDataFlowMonito
 import GapLimitedWebhookSurfaceNoWebhookKeywo from './pages/GapLimitedWebhookSurfaceNoWebhookKeywo';
 import GapNoPublicFacingPrivacyPortalFor from './pages/GapNoPublicFacingPrivacyPortalFor';
 import CustomViewsPage from './pages/CustomViewsPage';
+import TransferImpactAssessmentQueue from './pages/TransferImpactAssessmentQueue';
 
 const FEATURES = {
   'processing-activities': { title: 'Processing Activities (ROPA)', endpoint: 'processing-activities', icon: '📋', color: '#6c5ce7' },
@@ -443,6 +444,9 @@ function App() {
           <div data-testid="sidebar-custom-views" className={`sidebar-item ${currentPage === 'custom-views' ? 'active' : ''}`} onClick={() => navigate('custom-views')}>
             🛡️ GDPR Views
           </div>
+          <div className={`sidebar-item ${currentPage === 'transfer-impact-assessment-queue' ? 'active' : ''}`} onClick={() => navigate('transfer-impact-assessment-queue')}>
+            🌍 TIA Queue
+          </div>
         </div>
 
         <div className="sidebar-user">
@@ -466,6 +470,9 @@ function App() {
         )}
         {currentPage === 'custom-views' && (
           <CustomViewsPage />
+        )}
+        {currentPage === 'transfer-impact-assessment-queue' && (
+          <TransferImpactAssessmentQueue />
         )}
         {isCrudPage && (
           <CrudPage
