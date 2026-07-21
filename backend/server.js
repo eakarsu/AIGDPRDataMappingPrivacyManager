@@ -129,7 +129,7 @@ async function initExtraTables() {
     console.error('GDPR table init error (non-fatal):', err.message);
   }
 }
-initExtraTables();
+if (process.env.AUTO_INIT_SCHEMA === 'true') initExtraTables();
 
 // Audit logging middleware for mutating operations
 app.use('/api', (req, res, next) => {
@@ -635,6 +635,7 @@ app.use('/api/gap-no-public-facing-privacy-portal-for', route_gap_no_public_faci
 
 // Custom Views (2 VIZ + 2 NON-VIZ) — mounted BEFORE implicit 404 handler
 app.use('/api/custom-views', require('./routes/customViews'));
+app.use('/api/governed-privacy-operations', require('./governance'));
 
 app.listen(PORT, () => {
   console.log(`GDPR Privacy Manager Backend running on port ${PORT}`);

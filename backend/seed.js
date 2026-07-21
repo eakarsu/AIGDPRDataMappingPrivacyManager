@@ -2,6 +2,9 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+if (process.env.ALLOW_DEMO_SEED !== 'true' || process.env.NODE_ENV === 'production') {
+  throw new Error('Demo seed is quarantined; set ALLOW_DEMO_SEED=true outside production to run it explicitly');
+}
 
 const DB_NAME = process.env.DB_NAME || 'gdpr_privacy_manager';
 
