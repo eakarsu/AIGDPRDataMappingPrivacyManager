@@ -281,7 +281,7 @@ function App() {
   };
 
   const autoFill = () => {
-    setLoginForm({ email: 'admin@privacyguard.com', password: 'Admin@2026!' });
+    setLoginForm({ email: process.env.REACT_APP_DEMO_EMAIL || '', password: process.env.REACT_APP_DEMO_PASSWORD || '' });
   };
 
   const navigate = useCallback((page) => {

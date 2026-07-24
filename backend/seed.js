@@ -8,6 +8,12 @@ if (process.env.ALLOW_DEMO_SEED !== 'true' || process.env.NODE_ENV === 'producti
 
 const DB_NAME = process.env.DB_NAME || 'gdpr_privacy_manager';
 
+function requireDemoPassword() {
+  const password = process.env.DEMO_PASSWORD || process.env.SEED_DEMO_PASSWORD || process.env.DEMO_SEED_PASSWORD || '';
+  if (password.length < 12 || password.length > 1024) throw new Error('DEMO_PASSWORD must contain 12-1024 characters');
+  return password;
+}
+
 async function seed() {
   // Connect to postgres to create database
   const adminPool = new Pool({
@@ -314,7 +320,7 @@ async function seed() {
     // Seed users
     const userCount = await pool.query('SELECT COUNT(*) FROM users');
     if (parseInt(userCount.rows[0].count) === 0) {
-      const hash = await bcrypt.hash('Admin@2026!', 10);
+      const hash = await bcrypt.hash(requireDemoPassword(), 10);
       await pool.query(
         `INSERT INTO users (email, password_hash, full_name, role, department) VALUES ($1, $2, $3, $4, $5)`,
         ['admin@privacyguard.com', hash, 'Sarah Mitchell', 'DPO', 'Legal & Compliance']
