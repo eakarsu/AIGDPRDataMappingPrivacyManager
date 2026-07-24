@@ -9,13 +9,14 @@ const authMiddleware = require('../middleware/auth');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
+const OPENROUTER_BASE_URL = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
 
 // Enforce auth on all AI routes
 router.use(authMiddleware);
 
 async function callOpenRouter(messages) {
   if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -37,7 +38,9 @@ async function callOpenRouter(messages) {
   }
 
   const data = await response.json();
-  return { content: data.choices[0].message.content, model: data.model || OPENROUTER_MODEL };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content || !String(content).trim()) throw new Error('OpenRouter returned empty content');
+  return { content, model: data.model || OPENROUTER_MODEL };
 }
 
 // Persist AI result to DB

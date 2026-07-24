@@ -10,6 +10,7 @@ const authMiddleware = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
+const OPENROUTER_BASE_URL = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
 
 // Security middleware
 app.use(helmet());
@@ -269,7 +270,7 @@ const route_gap_no_public_facing_privacy_portal_for = require('./routes/gap-no-p
 const NEW_FEATURE_MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
 async function callOpenRouterSimple(systemPrompt, userPrompt) {
   if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not configured');
-  const response = await fetchFn('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetchFn(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
