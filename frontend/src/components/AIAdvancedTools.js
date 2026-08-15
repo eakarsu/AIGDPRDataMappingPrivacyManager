@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import GeneratedAiResponse from '../pages/GeneratedAiResponse';
 import { toast } from 'react-toastify';
 import { aiService } from '../services/api';
 
@@ -68,9 +69,7 @@ function ResultBlock({ data, error }) {
   return (
     <div style={{ marginTop: 16, padding: 16, borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
       <h4 style={{ marginTop: 0 }}>AI Result</h4>
-      <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, color: '#1e293b' }}>
-        {JSON.stringify(data, null, 2)}
-      </pre>
+      <GeneratedAiResponse response={data} />
     </div>
   );
 }

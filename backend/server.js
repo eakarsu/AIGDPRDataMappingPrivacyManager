@@ -637,6 +637,7 @@ app.use('/api/gap-no-public-facing-privacy-portal-for', route_gap_no_public_faci
 // Custom Views (2 VIZ + 2 NON-VIZ) — mounted BEFORE implicit 404 handler
 app.use('/api/custom-views', require('./routes/customViews'));
 app.use('/api/governed-privacy-operations', require('./governance'));
+app.use('/api', require('./routes/generatedFeatures').router);
 
 app.listen(PORT, () => {
   console.log(`GDPR Privacy Manager Backend running on port ${PORT}`);
