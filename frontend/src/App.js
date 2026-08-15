@@ -25,6 +25,7 @@ import GapLimitedWebhookSurfaceNoWebhookKeywo from './pages/GapLimitedWebhookSur
 import GapNoPublicFacingPrivacyPortalFor from './pages/GapNoPublicFacingPrivacyPortalFor';
 import CustomViewsPage from './pages/CustomViewsPage';
 import TransferImpactAssessmentQueue from './pages/TransferImpactAssessmentQueue';
+import DecisionCenter from './pages/DecisionCenter';
 
 const FEATURES = {
   'processing-activities': { title: 'Processing Activities (ROPA)', endpoint: 'processing-activities', icon: '📋', color: '#6c5ce7' },
@@ -423,6 +424,9 @@ function App() {
 
         <div className="sidebar-section">
           <div className="sidebar-section-title">Advanced Features</div>
+          <div className={`sidebar-item ${currentPage === 'decision-center' ? 'active' : ''}`} onClick={() => navigate('decision-center')}>
+            📈 Privacy Decision Center
+          </div>
           <div className={`sidebar-item ${currentPage === 'cf-cookie-scanner' ? 'active' : ''}`} onClick={() => navigate('cf-cookie-scanner')}>
             🔎 Cookie Scanner
           </div>
@@ -464,6 +468,9 @@ function App() {
       <main className="main-content">
         {currentPage === 'dashboard' && (
           <Dashboard features={FEATURES} onNavigate={navigate} />
+        )}
+        {currentPage === 'decision-center' && (
+          <DecisionCenter />
         )}
         {currentPage === 'regulatory-and-llm' && (
           <RegulatoryAndLLM />
