@@ -298,7 +298,7 @@ function App() {
           <p className="login-subtitle">AI-Powered Data Protection & Compliance Platform</p>
           {loginError && <div className="error-msg">{loginError}</div>}
           <button className="btn btn-auto-fill" onClick={autoFill}>
-            ⚡ Auto-Fill Demo Credentials
+            ⚡ Auto Fill Demo Credentials
           </button>
           <form onSubmit={handleLogin}>
             <div className="form-group">
