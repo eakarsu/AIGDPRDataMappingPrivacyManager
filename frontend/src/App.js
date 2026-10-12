@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import AIReportLibrary from "./components/AIReportLibrary";
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { authService, createCrudService, aiService } from './services/api';
@@ -246,6 +247,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
+  const loginRequest = useRef(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -255,12 +257,14 @@ function App() {
     }
   }, [token]);
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e, credentials = loginForm) => {
     e.preventDefault();
+    if (loginRequest.current) return;
+    loginRequest.current = true;
     setLoading(true);
     setLoginError('');
     try {
-      const res = await authService.login(loginForm.email, loginForm.password);
+      const res = await authService.login(credentials.email, credentials.password);
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       setToken(res.data.token);
@@ -269,6 +273,7 @@ function App() {
     } catch (err) {
       setLoginError(err.response?.data?.error || 'Login failed');
     } finally {
+      loginRequest.current = false;
       setLoading(false);
     }
   };
@@ -281,8 +286,15 @@ function App() {
     setCurrentPage('dashboard');
   };
 
-  const autoFill = () => {
-    setLoginForm({ email: process.env.REACT_APP_DEMO_EMAIL || '', password: process.env.REACT_APP_DEMO_PASSWORD || '' });
+  const handleDemoLogin = async () => {
+    if (loginRequest.current) return;
+    const credentials = { email: process.env.REACT_APP_DEMO_EMAIL || '', password: process.env.REACT_APP_DEMO_PASSWORD || '' };
+    if (process.env.REACT_APP_ENABLE_DEMO_CREDENTIAL_AUTOFILL !== 'true' || !credentials.email || !credentials.password) {
+      setLoginError('Demo sign-in is unavailable because public development credentials were not configured. Use your existing account or configure the native demo bridge.');
+      return;
+    }
+    setLoginForm(credentials);
+    await handleLogin({ preventDefault() {} }, credentials);
   };
 
   const navigate = useCallback((page) => {
@@ -297,8 +309,8 @@ function App() {
           <h1>GDPR Privacy Manager</h1>
           <p className="login-subtitle">AI-Powered Data Protection & Compliance Platform</p>
           {loginError && <div className="error-msg">{loginError}</div>}
-          <button className="btn btn-auto-fill" onClick={autoFill}>
-            ⚡ Auto Fill Demo Credentials
+          <button className="btn btn-auto-fill" type="button" onClick={handleDemoLogin} disabled={loading}>
+            ⚡ Log In as Demo
           </button>
           <form onSubmit={handleLogin}>
             <div className="form-group">
@@ -463,7 +475,7 @@ function App() {
           </div>
           <button className="btn-logout" onClick={handleLogout}>Sign Out</button>
         </div>
-      </aside>
+      <AIReportLibrary /></aside>
 
       <main className="main-content">
         {currentPage === 'dashboard' && (

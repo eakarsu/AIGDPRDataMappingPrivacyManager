@@ -12,24 +12,8 @@ const auth = require('../middleware/auth');
 let PDFDocument = null;
 try { PDFDocument = require('pdfkit'); } catch (_) { PDFDocument = null; }
 
-// ---------------------------------------------------------------------------
-// In-memory processing rules store (purposes + retention periods).
-// Seeded from common GDPR purpose categories so the editor renders something
-// useful even on first load.
-// ---------------------------------------------------------------------------
-const LAWFUL_BASES = [
-  'consent', 'contract', 'legal_obligation',
-  'vital_interests', 'public_task', 'legitimate_interests',
-];
-let _ruleId = 1;
-const seedRules = () => ([
-  { id: _ruleId++, purpose: 'Customer onboarding & KYC', lawful_basis: 'contract',             retention_period_days: 2555, retention_label: '7 years (statutory)' },
-  { id: _ruleId++, purpose: 'Marketing communications',  lawful_basis: 'consent',              retention_period_days: 730,  retention_label: '2 years or until withdrawal' },
-  { id: _ruleId++, purpose: 'Payroll & tax records',     lawful_basis: 'legal_obligation',     retention_period_days: 2555, retention_label: '7 years' },
-  { id: _ruleId++, purpose: 'Site analytics',            lawful_basis: 'legitimate_interests', retention_period_days: 395,  retention_label: '13 months' },
-  { id: _ruleId++, purpose: 'Health & safety records',   lawful_basis: 'vital_interests',      retention_period_days: 1825, retention_label: '5 years' },
-]);
-let processingRules = seedRules();
+const { handlersFor, LAWFUL_BASES } = require('../privacyPlanning');
+const processingRuleHandlers = handlersFor('processingRules');
 
 // ===========================================================================
 // VIZ 1: GET /api/custom-views/data-flow-sankey
@@ -339,60 +323,7 @@ router.post('/dpia-ropa-pdf', auth, async (req, res) => {
 //   GET  /api/custom-views/processing-rules
 //   POST /api/custom-views/processing-rules { op: create|update|delete|reset, rule }
 // ===========================================================================
-router.get('/processing-rules', auth, (req, res) => {
-  res.json({
-    ok: true,
-    lawful_bases: LAWFUL_BASES,
-    rules: processingRules,
-    count: processingRules.length,
-  });
-});
-
-router.post('/processing-rules', auth, (req, res) => {
-  try {
-    const { op = 'create', rule } = req.body || {};
-
-    if (op === 'reset') {
-      _ruleId = 1;
-      processingRules = seedRules();
-      return res.json({ ok: true, op, rules: processingRules });
-    }
-    if (op === 'delete') {
-      if (!rule || !rule.id) return res.status(400).json({ error: 'rule.id required' });
-      const before = processingRules.length;
-      processingRules = processingRules.filter((r) => r.id !== rule.id);
-      return res.json({ ok: true, op, removed: before - processingRules.length, rules: processingRules });
-    }
-    if (op === 'update') {
-      if (!rule || !rule.id) return res.status(400).json({ error: 'rule.id required' });
-      const idx = processingRules.findIndex((r) => r.id === rule.id);
-      if (idx === -1) return res.status(404).json({ error: 'rule not found' });
-      if (rule.lawful_basis && !LAWFUL_BASES.includes(rule.lawful_basis)) {
-        return res.status(400).json({ error: `lawful_basis must be one of ${LAWFUL_BASES.join(', ')}` });
-      }
-      processingRules[idx] = { ...processingRules[idx], ...rule, id: processingRules[idx].id };
-      return res.json({ ok: true, op, rule: processingRules[idx], rules: processingRules });
-    }
-    // default: create
-    const purpose = (rule && rule.purpose) || 'New processing purpose';
-    const basis = (rule && rule.lawful_basis) || 'consent';
-    if (!LAWFUL_BASES.includes(basis)) {
-      return res.status(400).json({ error: `lawful_basis must be one of ${LAWFUL_BASES.join(', ')}` });
-    }
-    const retDays = parseInt((rule && rule.retention_period_days) || 365, 10);
-    const created = {
-      id: _ruleId++,
-      purpose,
-      lawful_basis: basis,
-      retention_period_days: retDays,
-      retention_label: (rule && rule.retention_label) || `${Math.round(retDays / 30)} months`,
-    };
-    processingRules.push(created);
-    res.json({ ok: true, op: 'create', rule: created, rules: processingRules });
-  } catch (err) {
-    console.error('processing-rules error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
+router.get('/processing-rules', auth, processingRuleHandlers.list);
+router.post('/processing-rules', auth, processingRuleHandlers.mutate);
 
 module.exports = router;

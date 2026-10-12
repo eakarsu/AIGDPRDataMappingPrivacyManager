@@ -566,8 +566,8 @@ app.get('/api/policy-corpus', authMiddleware, async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
     const [rows, count] = await Promise.all([
-      query('SELECT id, title, category, tags, created_at FROM policy_corpus ORDER BY created_at DESC LIMIT $1 OFFSET $2', [limit, offset]),
-      query('SELECT COUNT(*) FROM policy_corpus'),
+      query('SELECT id, title, category, tags, created_at, is_demo, demo_label FROM policy_corpus WHERE NOT is_demo OR demo_owner_id=$3 ORDER BY created_at DESC LIMIT $1 OFFSET $2', [limit, offset, req.user.id]),
+      query('SELECT COUNT(*) FROM policy_corpus WHERE NOT is_demo OR demo_owner_id=$1', [req.user.id]),
     ]);
     res.json({ data: rows.rows, total: parseInt(count.rows[0].count), page, limit });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -583,7 +583,8 @@ app.post('/api/policy-corpus/query', authMiddleware, aiLimiter, async (req, res)
     if (tokens.length > 0) {
       const ilikes = tokens.map((_, i) => `(LOWER(content) LIKE $${i + 1} OR LOWER(title) LIKE $${i + 1})`).join(' OR ');
       const params = tokens.map((t) => `%${t}%`);
-      candidates = await query(`SELECT id, title, category, content FROM policy_corpus WHERE ${ilikes} LIMIT 20`, params);
+      params.push(req.user.id);
+      candidates = await query(`SELECT id, title, category, content, is_demo, demo_label FROM policy_corpus WHERE (${ilikes}) AND (NOT is_demo OR demo_owner_id=$${params.length}) LIMIT 20`, params);
     }
     // Score by token-hit count
     const scored = candidates.rows.map((row) => {
@@ -592,8 +593,8 @@ app.post('/api/policy-corpus/query', authMiddleware, aiLimiter, async (req, res)
       return { ...row, _score: score };
     }).sort((a, b) => b._score - a._score).slice(0, k);
 
-    const contextSnippets = scored.map((r) => `# ${r.title}\n${(r.content || '').slice(0, 1500)}`).join('\n\n---\n\n');
-    const systemPrompt = `You are a privacy expert. Answer the user's question grounded ONLY in the provided organizational policy corpus. If the corpus does not address it, say so explicitly. Return STRICT JSON: {"answer": "", "citations": [{"policy_title": "", "snippet": ""}], "confidence": "low|medium|high"}`;
+    const contextSnippets = scored.map((r) => `# ${r.is_demo ? 'Fictional unreviewed draft · ' : ''}${r.title}\n${(r.content || '').slice(0, 1500)}`).join('\n\n---\n\n');
+    const systemPrompt = `You are a privacy expert. Answer the user's question grounded ONLY in the provided policy corpus. Clearly labeled fictional demo or unreviewed drafts are research examples, never approved organizational policy, actual consent, signed agreements or verified legal obligations. Distinguish them explicitly in the answer. If the corpus does not address it, say so explicitly. Return STRICT JSON: {"answer": "", "citations": [{"policy_title": "", "snippet": ""}], "confidence": "low|medium|high"}`;
     const userPrompt = `Organization policy corpus:\n${contextSnippets || '(empty)'}\n\nQuestion: ${question}\n\nReturn JSON only.`;
     const raw = await callOpenRouterSimple(systemPrompt, userPrompt);
     const parsed = parseJsonStrict(raw);
@@ -624,6 +625,7 @@ app.use('/api/ai', aiLimiter, require('./routes/ai'));
 app.use('/api/agentic-compliance-auditor', require('./routes/agenticComplianceAuditor'));
 app.use('/api/vendor-supply-chain', require('./routes/vendorSupplyChainVisibility'));
 app.use('/api/transfer-impact-assessment-queue', authMiddleware, require('./routes/transferImpactAssessmentQueue'));
+app.use('/api/privacy-decision-drafts', authMiddleware, require('./routes/privacyDecisionDrafts'));
 
 
 app.use('/api/gap-no-third-party-code-sdk-audit', route_gap_no_third_party_code_sdk_audit);
@@ -639,6 +641,14 @@ app.use('/api/custom-views', require('./routes/customViews'));
 app.use('/api/governed-privacy-operations', require('./governance'));
 app.use('/api', require('./routes/generatedFeatures').router);
 
+
+// Advisory AI reports only; native execution and approval routes stay unchanged.
+const aiWorkspaceSupport = require("./aiWorkspaceAdapters.cjs");
+const aiWorkspaceDatabase = require("./db.js").pool;
+app.use('/api/report-workspace', require("./aiWorkspace.cjs").createAIWorkspaceRouter({
+  pool: aiWorkspaceDatabase, authenticateToken: require("./middleware/auth.js"),
+  aiRateLimiter: aiWorkspaceSupport.createWorkspaceLimiter(), features: require("./aiWorkspaceFeatures.json"),
+}));
 app.listen(PORT, () => {
   console.log(`GDPR Privacy Manager Backend running on port ${PORT}`);
 });

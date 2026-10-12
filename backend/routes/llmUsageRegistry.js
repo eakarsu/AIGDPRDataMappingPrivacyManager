@@ -37,6 +37,10 @@ async function ensureTable() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+  await query(`ALTER TABLE llm_usage_registry ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE llm_usage_registry ADD COLUMN IF NOT EXISTS demo_label TEXT;
+    ALTER TABLE llm_usage_registry ADD COLUMN IF NOT EXISTS demo_owner_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
+    ALTER TABLE llm_usage_registry ADD COLUMN IF NOT EXISTS demo_key TEXT;`);
   _ensured = true;
 }
 router.use(async (req, res, next) => { try { await ensureTable(); next(); } catch (e) { res.status(500).json({ error: e.message }); } });
@@ -57,7 +61,7 @@ function scoreRow(row) {
 
 router.get('/', async (req, res) => {
   try {
-    const r = await query(`SELECT * FROM llm_usage_registry ORDER BY risk_score DESC NULLS LAST, created_at DESC`);
+    const r = await query(`SELECT * FROM llm_usage_registry WHERE NOT is_demo OR demo_owner_id=$1 ORDER BY risk_score DESC NULLS LAST, created_at DESC`, [req.user.id]);
     res.json(r.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -96,17 +100,19 @@ router.put('/:id', async (req, res) => {
     if (sets.length === 0) return res.status(400).json({ error: 'no fields' });
     // Recompute score from merged record after update
     params.push(req.params.id);
-    const upd = await query(`UPDATE llm_usage_registry SET ${sets.join(', ')}, updated_at=CURRENT_TIMESTAMP WHERE id=$${params.length} RETURNING *`, params);
+    const idPosition = params.length;
+    params.push(req.user.id);
+    const upd = await query(`UPDATE llm_usage_registry SET ${sets.join(', ')}, updated_at=CURRENT_TIMESTAMP WHERE id=$${idPosition} AND (NOT is_demo OR demo_owner_id=$${params.length}) RETURNING *`, params);
     if (upd.rowCount === 0) return res.status(404).json({ error: 'not found' });
     const score = scoreRow(upd.rows[0]);
-    const r2 = await query(`UPDATE llm_usage_registry SET risk_score=$1 WHERE id=$2 RETURNING *`, [score, req.params.id]);
+    const r2 = await query(`UPDATE llm_usage_registry SET risk_score=$1 WHERE id=$2 AND (NOT is_demo OR demo_owner_id=$3) RETURNING *`, [score, req.params.id, req.user.id]);
     res.json(r2.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete('/:id', async (req, res) => {
   try {
-    const r = await query(`DELETE FROM llm_usage_registry WHERE id=$1`, [req.params.id]);
+    const r = await query(`DELETE FROM llm_usage_registry WHERE id=$1 AND (NOT is_demo OR demo_owner_id=$2)`, [req.params.id, req.user.id]);
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -120,7 +126,7 @@ router.get('/summary', async (req, res) => {
         COUNT(*) FILTER (WHERE dpa_status='none')::int AS no_dpa,
         COUNT(*) FILTER (WHERE tier='consumer')::int AS consumer_tier,
         AVG(risk_score)::int AS avg_risk_score
-      FROM llm_usage_registry`);
+      FROM llm_usage_registry WHERE NOT is_demo OR demo_owner_id=$1`, [req.user.id]);
     res.json(r.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

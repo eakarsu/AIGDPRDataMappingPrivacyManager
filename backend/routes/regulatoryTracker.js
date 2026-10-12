@@ -13,14 +13,7 @@ const express = require('express');
 const router = express.Router();
 const { query } = require('../db');
 
-const SEED = [
-  { jurisdiction: 'EU', source: 'EDPB', title: 'Guidelines on the use of personal data for direct marketing (2024)', summary: 'Updated direct-marketing guidance clarifying soft opt-in and B2B distinctions.', effective_date: '2024-03-15', impact: 'medium', tags: ['marketing','consent'] },
-  { jurisdiction: 'EU', source: 'EU AI Act', title: 'EU AI Act (Regulation (EU) 2024/1689) — risk-based AI obligations', summary: 'Tiered obligations for prohibited / high-risk / limited-risk AI systems.', effective_date: '2024-08-01', impact: 'high', tags: ['ai-governance','high-risk'] },
-  { jurisdiction: 'EU', source: 'ePrivacy Regulation (proposed)', title: 'ePrivacy Regulation — pending update', summary: 'Cookie & electronic-communications rules update; replaces 2002/58/EC.', effective_date: null, impact: 'high', tags: ['cookies','tracking'] },
-  { jurisdiction: 'UK', source: 'ICO', title: 'UK GDPR & DPDI Bill alignment', summary: 'Data Protection and Digital Information Bill — UK divergence on legitimate interests + automated decisions.', effective_date: null, impact: 'medium', tags: ['uk-gdpr'] },
-  { jurisdiction: 'US-CA', source: 'CCPA/CPRA', title: 'CPRA 2024 enforcement updates', summary: 'CPPA enforcement actions on dark-pattern consent and SPI handling.', effective_date: '2024-07-01', impact: 'medium', tags: ['us-state','spi'] },
-  { jurisdiction: 'BR', source: 'ANPD', title: 'LGPD Authorization Decision 11/2023', summary: 'Brazil ANPD international data-transfer authorizations.', effective_date: '2024-01-15', impact: 'medium', tags: ['transfers','lgpd'] },
-];
+
 
 let _ensured = false;
 async function ensureTable() {
@@ -48,16 +41,12 @@ async function ensureTable() {
       UNIQUE (user_id)
     );
   `);
-  // seed if empty
-  const c = await query('SELECT COUNT(*)::int AS n FROM regulatory_changes');
-  if (c.rows[0].n === 0) {
-    for (const s of SEED) {
-      await query(
-        `INSERT INTO regulatory_changes (jurisdiction, source, title, summary, effective_date, impact, tags) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [s.jurisdiction, s.source, s.title, s.summary, s.effective_date, s.impact, s.tags]
-      );
-    }
-  }
+  await query(`ALTER TABLE regulatory_changes ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE regulatory_changes ADD COLUMN IF NOT EXISTS demo_label TEXT;
+    ALTER TABLE regulatory_changes ADD COLUMN IF NOT EXISTS demo_owner_id INTEGER REFERENCES users(id) ON DELETE RESTRICT;
+    ALTER TABLE regulatory_changes ADD COLUMN IF NOT EXISTS demo_key TEXT;`);
+  // Research drafts are added explicitly by the idempotent local demo operation.
+  // Native reads never fabricate law, regulator guidance or verified effective dates.
   _ensured = true;
 }
 router.use(async (req, res, next) => { try { await ensureTable(); next(); } catch (e) { res.status(500).json({ error: e.message }); } });
@@ -65,7 +54,7 @@ router.use(async (req, res, next) => { try { await ensureTable(); next(); } catc
 router.get('/', async (req, res) => {
   try {
     const { jurisdiction, impact, tag } = req.query;
-    const clauses = []; const params = [];
+    const clauses = ['(NOT is_demo OR demo_owner_id=$1)']; const params = [req.user.id];
     if (jurisdiction) { params.push(jurisdiction); clauses.push(`jurisdiction = $${params.length}`); }
     if (impact) { params.push(impact); clauses.push(`impact = $${params.length}`); }
     if (tag) { params.push(tag); clauses.push(`$${params.length} = ANY(tags)`); }
@@ -112,12 +101,12 @@ router.get('/feed', async (req, res) => {
     const sub = await query(`SELECT * FROM regulatory_subscriptions WHERE user_id=$1`, [req.user.id]);
     const ranks = { low: 0, medium: 1, high: 2 };
     if (sub.rowCount === 0) {
-      const r = await query(`SELECT * FROM regulatory_changes ORDER BY created_at DESC LIMIT 50`);
+      const r = await query(`SELECT * FROM regulatory_changes WHERE NOT is_demo OR demo_owner_id=$1 ORDER BY created_at DESC LIMIT 50`, [req.user.id]);
       return res.json({ subscription: null, items: r.rows });
     }
     const s = sub.rows[0];
-    const params = [];
-    const clauses = [];
+    const params = [req.user.id];
+    const clauses = ['(NOT is_demo OR demo_owner_id=$1)'];
     if (s.jurisdictions?.length) { params.push(s.jurisdictions); clauses.push(`jurisdiction = ANY($${params.length})`); }
     if (s.tags?.length) { params.push(s.tags); clauses.push(`tags && $${params.length}`); }
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';

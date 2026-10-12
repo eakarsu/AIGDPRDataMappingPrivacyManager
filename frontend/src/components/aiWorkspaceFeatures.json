@@ -1,0 +1,262 @@
+[
+  {
+    "name": "CfAdaptiveWorkforcePrivacyTrainingPlat",
+    "id": "cf-adaptive-workforce-privacy-training-plat",
+    "title": "Adaptive Workforce Privacy Training",
+    "description": "Prepare a role-based privacy training plan with learning objectives, review checkpoints, evidence needs, and measured follow-up.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Adaptive Workforce Privacy Training for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Adaptive Workforce Privacy Training. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Adaptive Workforce Privacy Training. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "CfAgenticComplianceAuditorContinuously",
+    "id": "cf-agentic-compliance-auditor-continuously-",
+    "title": "Continuous Cloud Compliance Review",
+    "description": "Review a proposed continuous cloud-compliance workflow, identify evidence gaps, and prepare a governed remediation plan without claiming that infrastructure was scanned.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Continuous Cloud Compliance Review for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Continuous Cloud Compliance Review. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Continuous Cloud Compliance Review. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "CfConsentBannerAbTesterRecommendingVa",
+    "id": "cf-consent-banner-ab-tester-recommending-va",
+    "title": "Consent Banner Variant Review",
+    "description": "Compare consent-banner approaches for clarity, freely given choice, and dark-pattern risk. Recommendations remain drafts for legal and product review.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Consent Banner Variant Review for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Consent Banner Variant Review. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Consent Banner Variant Review. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "CfLlmfoundationModelUsageScannerExtend",
+    "id": "cf-llmfoundation-model-usage-scanner-extend",
+    "title": "LLM Usage Discovery and Governance",
+    "description": "Plan an inventory and governance review for foundation-model usage, including owners, personal-data exposure, provider evidence, and approval gates.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a LLM Usage Discovery and Governance for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for LLM Usage Discovery and Governance. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for LLM Usage Discovery and Governance. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "CfRegulatoryChangeTrackerAutoGeneratin",
+    "id": "cf-regulatory-change-tracker-auto-generatin",
+    "title": "Regulatory Change Gap Assessment",
+    "description": "Assess a supplied regulatory change against documented practices and prepare traceable gap, evidence, ownership, and review actions.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Regulatory Change Gap Assessment for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Regulatory Change Gap Assessment. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Regulatory Change Gap Assessment. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "CfVendorSupplyChainVisibilityMapping2",
+    "id": "cf-vendor-supply-chain-visibility-mapping-2",
+    "title": "Vendor Supply-Chain Privacy Map",
+    "description": "Prepare a reviewable second- and third-party data-flow map from supplied vendor evidence, highlighting missing contracts, transfers, and owners.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Vendor Supply-Chain Privacy Map for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Vendor Supply-Chain Privacy Map. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Vendor Supply-Chain Privacy Map. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "GapLimitedWebhookSurfaceNoWebhookKeywo",
+    "id": "gap-limited-webhook-surface-no-webhook-keywo",
+    "title": "Webhook Privacy Surface Review",
+    "description": "Review a supplied webhook inventory for personal-data exposure, authentication, delivery evidence, retention, and incident-response gaps.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Webhook Privacy Surface Review for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Webhook Privacy Surface Review. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Webhook Privacy Surface Review. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "GapNoAutomatedDpaContractTemplateGener",
+    "id": "gap-no-automated-dpa-contract-template-gener",
+    "title": "DPA Drafting Readiness Assessment",
+    "description": "Assess supplied processing information for DPA drafting readiness and identify clauses, evidence, legal decisions, and approvals still required.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a DPA Drafting Readiness Assessment for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for DPA Drafting Readiness Assessment. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for DPA Drafting Readiness Assessment. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "GapNoAutomatedDsrFulfillmentDataExport",
+    "id": "gap-no-automated-dsr-fulfillment-data-export",
+    "title": "DSR Fulfillment Planning",
+    "description": "Prepare a review-only DSR fulfillment plan covering source discovery, identity gates, exceptions, export, redaction, approval, and evidence retention.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a DSR Fulfillment Planning for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for DSR Fulfillment Planning. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for DSR Fulfillment Planning. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "GapNoPublicFacingPrivacyPortalFor",
+    "id": "gap-no-public-facing-privacy-portal-for",
+    "title": "Privacy Request Portal Readiness",
+    "description": "Assess requirements for a public privacy-request portal, including accessibility, identity verification, routing, status transparency, and security.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Privacy Request Portal Readiness for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Privacy Request Portal Readiness. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Privacy Request Portal Readiness. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "GapNoRealTimeDataFlowMonitoring",
+    "id": "gap-no-real-time-data-flow-monitoring",
+    "title": "Data-Flow Monitoring Readiness",
+    "description": "Prepare a monitored data-flow operating model from supplied system information without claiming that live infrastructure has been observed.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Data-Flow Monitoring Readiness for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Data-Flow Monitoring Readiness. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Data-Flow Monitoring Readiness. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "GapNoRecommendationEngineBiasCheck",
+    "id": "gap-no-recommendation-engine-bias-check",
+    "title": "Recommendation-System Bias Review",
+    "description": "Review supplied aggregate recommendation outcomes for potential disparate impact, evidence gaps, oversight controls, and follow-up analysis.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Recommendation-System Bias Review for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Recommendation-System Bias Review. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Recommendation-System Bias Review. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  },
+  {
+    "name": "GapNoThirdPartyCodeSdkAudit",
+    "id": "gap-no-third-party-code-sdk-audit",
+    "title": "Third-Party SDK Privacy Audit",
+    "description": "Review a supplied SDK and library inventory for data collection, transfer, disclosure, contract, configuration, and replacement risks.",
+    "samples": [
+      {
+        "label": "Scenario",
+        "value": "Prepare a Third-Party SDK Privacy Audit for a fictional training scenario. Separate supplied observations from assumptions, identify missing evidence, and propose review actions without claiming that any scan, approval, consent, contract, or external action occurred."
+      },
+      {
+        "label": "Data sample",
+        "value": "Analyze the supplied example inputs for Third-Party SDK Privacy Audit. Distinguish actual source references from illustrative values; report findings, gaps, dependencies, owners, and verification steps."
+      },
+      {
+        "label": "Executive review",
+        "value": "Prepare an executive review for Third-Party SDK Privacy Audit. Summarize impact, risk, effort, evidence gaps, decision points, approval gates, and a concise next-step plan."
+      }
+    ]
+  }
+]

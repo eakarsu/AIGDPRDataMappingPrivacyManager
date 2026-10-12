@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { createCrudService } from '../services/api';
+import AIResultView from './AIResultView';
 
 const TABS = [
   { key: 'ai-risk-assessment', label: 'Risk Assessment', icon: '⚠️', group: 'general' },
@@ -145,8 +146,20 @@ function AIInsights({ aiService, onBack, initialTab }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'ai-risk-assessment');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [aiError, setAiError] = useState('');
+  const [aiNotice, setAiNotice] = useState('');
   const [forms, setForms] = useState(INITIAL_FORMS);
   const [dbData, setDbData] = useState({});
+  const [dbErrors, setDbErrors] = useState({});
+  const [dbLoading, setDbLoading] = useState({});
+  const [inputOrigin, setInputOrigin] = useState({});
+  const dbRequests = useRef(new Set());
+  const aiRequest = useRef(null);
+
+  useEffect(() => () => {
+    aiRequest.current?.abort();
+    aiRequest.current = null;
+  }, []);
 
   useEffect(() => {
     if (initialTab && TABS.find(t => t.key === initialTab)) {
@@ -156,14 +169,22 @@ function AIInsights({ aiService, onBack, initialTab }) {
   }, [initialTab]);
 
   // Load database data for current tab
-  const loadDbData = useCallback(async (tab) => {
+  const loadDbData = useCallback(async (tab, retry = false) => {
     const source = DATA_SOURCES[tab];
-    if (!source || dbData[tab]) return;
+    if (!source || (!retry && dbData[tab]) || dbRequests.current.has(tab)) return;
+    dbRequests.current.add(tab);
+    setDbLoading(prev => ({ ...prev, [tab]: true }));
+    setDbErrors(prev => ({ ...prev, [tab]: '' }));
     try {
       const res = await createCrudService(source.endpoint).getAll();
-      setDbData(prev => ({ ...prev, [tab]: res.data }));
-    } catch {
-      // silently fail
+      const rows = Array.isArray(res.data) ? res.data : res.data?.data;
+      if (!Array.isArray(rows)) throw new Error('The source API did not return a record list.');
+      setDbData(prev => ({ ...prev, [tab]: rows }));
+    } catch (error) {
+      setDbErrors(prev => ({ ...prev, [tab]: error.response?.data?.error || error.message || 'Could not load saved source records.' }));
+    } finally {
+      dbRequests.current.delete(tab);
+      setDbLoading(prev => ({ ...prev, [tab]: false }));
     }
   }, [dbData]);
 
@@ -183,218 +204,77 @@ function AIInsights({ aiService, onBack, initialTab }) {
     const source = DATA_SOURCES[activeTab];
     if (source && source.mapFn) {
       setFormData(source.mapFn(item));
+      setInputOrigin(prev => ({ ...prev, [activeTab]: `Saved source: ${item[source.labelField]}. Review the source facts before generating.` }));
       toast.info(`Loaded: ${item[source.labelField]}`);
     }
   };
 
   const loadSample = (sample) => {
-    setFormData(sample.data);
+    setForms(prev => ({ ...prev, [activeTab]: { ...INITIAL_FORMS[activeTab], ...sample.data } }));
+    setInputOrigin(prev => ({ ...prev, [activeTab]: `Fictional demo scenario: ${sample.label}. These values are draft examples, not actual consent, a signed agreement or verified evidence.` }));
     toast.info(`Sample loaded: ${sample.label}`);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (aiRequest.current) return;
+    const controller = new AbortController();
+    aiRequest.current = controller;
     setLoading(true);
     setResult(null);
+    setAiError('');
+    setAiNotice('');
     try {
       let res;
       const d = forms[activeTab];
+      const config = { signal: controller.signal };
       switch (activeTab) {
-        case 'ai-risk-assessment': res = await aiService.riskAssessment(d); break;
-        case 'ai-dpia-generator': res = await aiService.dpiaGenerate(d); break;
-        case 'ai-compliance-gap': res = await aiService.complianceGap(d); break;
-        case 'ai-data-classification': res = await aiService.classifyData(d); break;
-        case 'ai-breach-response': res = await aiService.breachResponse(d); break;
-        case 'ai-policy-generator': res = await aiService.generatePolicy(d); break;
-        case 'ai-activity-analyzer': res = await aiService.analyzeActivity(d); break;
-        case 'ai-dsr-drafter': res = await aiService.draftDsrResponse(d); break;
-        case 'ai-dpia-advisor': res = await aiService.dpiaAdvice(d); break;
-        case 'ai-consent-optimizer': res = await aiService.optimizeConsent(d); break;
-        case 'ai-breach-analyzer': res = await aiService.analyzeBreach(d); break;
-        case 'ai-vendor-assessor': res = await aiService.assessVendor(d); break;
-        case 'ai-retention-advisor': res = await aiService.retentionAdvice(d); break;
-        case 'ai-cookie-auditor': res = await aiService.auditCookies(d); break;
-        case 'ai-transfer-evaluator': res = await aiService.evaluateTransfer(d); break;
-        case 'ai-training-recommender': res = await aiService.recommendTraining(d); break;
+        case 'ai-risk-assessment': res = await aiService.riskAssessment(d, config); break;
+        case 'ai-dpia-generator': res = await aiService.dpiaGenerate(d, config); break;
+        case 'ai-compliance-gap': res = await aiService.complianceGap(d, config); break;
+        case 'ai-data-classification': res = await aiService.classifyData(d, config); break;
+        case 'ai-breach-response': res = await aiService.breachResponse(d, config); break;
+        case 'ai-policy-generator': res = await aiService.generatePolicy(d, config); break;
+        case 'ai-activity-analyzer': res = await aiService.analyzeActivity(d, config); break;
+        case 'ai-dsr-drafter': res = await aiService.draftDsrResponse(d, config); break;
+        case 'ai-dpia-advisor': res = await aiService.dpiaAdvice(d, config); break;
+        case 'ai-consent-optimizer': res = await aiService.optimizeConsent(d, config); break;
+        case 'ai-breach-analyzer': res = await aiService.analyzeBreach(d, config); break;
+        case 'ai-vendor-assessor': res = await aiService.assessVendor(d, config); break;
+        case 'ai-retention-advisor': res = await aiService.retentionAdvice(d, config); break;
+        case 'ai-cookie-auditor': res = await aiService.auditCookies(d, config); break;
+        case 'ai-transfer-evaluator': res = await aiService.evaluateTransfer(d, config); break;
+        case 'ai-training-recommender': res = await aiService.recommendTraining(d, config); break;
         default: return;
       }
+      if (aiRequest.current !== controller) return;
       setResult(res.data.data || res.data);
       toast.success('AI analysis complete!');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'AI analysis failed. Check your OpenRouter API key.');
+      if (controller.signal.aborted) {
+        setAiNotice('OpenRouter request cancelled. Review the inputs or generate again.');
+      } else {
+        const message = err.response?.data?.error || err.message || 'OpenRouter analysis failed.';
+        setAiError(message);
+        toast.error(message);
+      }
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const getScoreLevel = (score) => {
-    if (score <= 25) return 'low';
-    if (score <= 50) return 'medium';
-    if (score <= 75) return 'high';
-    return 'critical';
-  };
-
-  // ======================== RENDER HELPERS ========================
-
-  const renderGenericResult = (data) => {
-    if (!data) return null;
-    if (data.raw_response) return <div className="ai-result-section"><p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{data.raw_response}</p></div>;
-    return <div className="ai-result">{renderScoreSection(data)}{renderSections(data)}</div>;
-  };
-
-  const renderScoreSection = (data) => {
-    const score = data.risk_score || data.compliance_score || data.quality_score || data.transfer_risk_score;
-    const level = data.overall_risk_level || data.risk_level || data.overall_status || data.overall_quality;
-    const summary = data.summary;
-    if (!score && !summary) return null;
-    return (
-      <div className="ai-result-section">
-        <h3>Assessment Summary</h3>
-        <div className="ai-score">
-          {score && <div className={`ai-score-circle ${getScoreLevel(typeof level === 'string' && ['low','medium','high','critical'].includes(level) ? {low:20,medium:40,high:70,critical:90}[level] : score)}`}>{score}</div>}
-          <div>
-            {level && <div style={{ fontSize: 18, fontWeight: 600 }}>Status: <span className={`badge badge-${level === 'compliant' || level === 'excellent' || level === 'good' ? 'active' : level === 'partially_compliant' || level === 'needs_improvement' ? 'medium' : level}`}>{String(level).replace(/_/g, ' ').toUpperCase()}</span></div>}
-            {summary && <p style={{ color: '#666', marginTop: 4 }}>{summary}</p>}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderArray = (arr, title) => {
-    if (!arr || !Array.isArray(arr) || arr.length === 0) return null;
-    return (
-      <div key={title} className="ai-result-section">
-        <h3>{title}</h3>
-        {arr.map((item, i) => {
-          if (typeof item === 'string') return <div key={i} className="ai-recommendation"><div><p>{item}</p></div></div>;
-          const mainKey = ['risk','action','requirement','course_name','element','issue','step','measure','clause','metric','section','category','process','scenario','term','field_name','item'].find(k => item[k]) || Object.keys(item)[0];
-          return (
-            <div key={i} className="ai-risk-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4 style={{ margin: 0 }}>{item[mainKey]}</h4>
-                {(item.priority || item.severity || item.level || item.type || item.quality) && (
-                  <span className={`badge badge-${item.priority || item.severity || item.level || item.type || item.quality}`}>
-                    {String(item.priority || item.severity || item.level || item.type || item.quality).replace(/_/g, ' ')}
-                  </span>
-                )}
-              </div>
-              {Object.entries(item).filter(([k]) => k !== mainKey && !['priority','severity','level','type','quality'].includes(k)).map(([k, v]) => (
-                <p key={k} style={{ fontSize: 13, color: '#666', margin: '4px 0' }}>
-                  <strong>{k.replace(/_/g, ' ')}:</strong> {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : Array.isArray(v) ? v.join(', ') : String(v)}
-                </p>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const renderObject = (obj, title) => {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
-    return (
-      <div key={title} className="ai-result-section">
-        <h3>{title}</h3>
-        <div className="detail-grid">
-          {Object.entries(obj).map(([k, v]) => (
-            <div key={k} className={`detail-item ${(typeof v === 'string' && v.length > 100) || Array.isArray(v) ? 'full-width' : ''}`}>
-              <label>{k.replace(/_/g, ' ')}</label>
-              {typeof v === 'boolean' ? <span className={`badge badge-${v ? 'active' : 'high'}`}>{v ? 'Yes' : 'No'}</span> :
-               Array.isArray(v) ? <p>{v.join(', ')}</p> :
-               typeof v === 'object' ? <p>{JSON.stringify(v, null, 2)}</p> :
-               <p>{String(v)}</p>}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderSections = (data) => {
-    const skipKeys = ['risk_score','compliance_score','quality_score','transfer_risk_score','overall_risk_level','overall_status','overall_quality','risk_level','summary','raw_response'];
-    const sections = [];
-    for (const [key, value] of Object.entries(data)) {
-      if (skipKeys.includes(key)) continue;
-      if (key === 'dpia_report' && value?.sections) {
-        const report = value;
-        sections.push(<div key="dpia-header" className="ai-result-section"><h3>{report.title || 'DPIA Report'}</h3><p style={{ color: '#888' }}>Version: {report.version} | Date: {report.date}</p></div>);
-        const s = report.sections;
-        if (s.project_overview) sections.push(renderObject(s.project_overview, 'Project Overview'));
-        if (s.processing_description) sections.push(renderObject(s.processing_description, 'Processing Description'));
-        if (s.necessity_assessment) sections.push(renderObject(s.necessity_assessment, 'Necessity & Proportionality'));
-        if (s.risk_assessment?.risks) sections.push(renderArray(s.risk_assessment.risks, 'Risk Assessment'));
-        if (s.mitigation_measures) sections.push(renderArray(s.mitigation_measures, 'Mitigation Measures'));
-        if (s.residual_risks) sections.push(renderArray(s.residual_risks, 'Residual Risks'));
-        if (s.dpo_opinion) sections.push(<div key="dpo" className="ai-result-section"><h3>DPO Opinion</h3><p>{s.dpo_opinion}</p></div>);
-        if (s.conclusion) sections.push(renderObject(s.conclusion, 'Conclusion'));
-        continue;
-      }
-      if (key === 'policy' && value?.sections) {
-        sections.push(<div key="policy-header" className="ai-result-section"><h3>{value.title || 'Generated Policy'}</h3><p style={{ color: '#888' }}>Version: {value.version} | Effective: {value.effective_date}</p></div>);
-        value.sections.forEach((s, i) => {
-          sections.push(<div key={`pol-${i}`} className="ai-policy-section"><h4>{s.number}. {s.title}</h4><p>{s.content}</p>{s.subsections?.map((sub, j) => (<div key={j} style={{ marginTop: 12, paddingLeft: 16, borderLeft: '2px solid #e0e0e0' }}><h4 style={{ fontSize: 13 }}>{sub.title}</h4><p>{sub.content}</p></div>))}</div>);
-        });
-        if (value.definitions) sections.push(renderArray(value.definitions, 'Definitions'));
-        continue;
-      }
-      if (key === 'notification_templates') {
-        sections.push(<div key={key} className="ai-result-section"><h3>Notification Templates</h3>{value.supervisory_authority && (<div className="notification-template"><h4>Supervisory Authority Notification</h4><p><strong>Subject:</strong> {value.supervisory_authority.subject}</p>{value.supervisory_authority.body_sections && Object.entries(value.supervisory_authority.body_sections).map(([k, v]) => (<p key={k}><strong>{k.replace(/_/g, ' ')}:</strong> {v}</p>))}</div>)}{value.data_subjects && (<div className="notification-template"><h4>Data Subject Notification</h4><p><strong>Subject:</strong> {value.data_subjects.subject}</p><p style={{ whiteSpace: 'pre-wrap' }}>{value.data_subjects.body}</p></div>)}</div>);
-        continue;
-      }
-      if (key === 'response_letter') {
-        sections.push(<div key={key} className="ai-result-section"><h3>Draft Response Letter</h3><div className="notification-template"><p><strong>Subject:</strong> {value.subject}</p><p style={{ marginTop: 12 }}>{value.greeting}</p>{value.body_paragraphs?.map((p, i) => <p key={i} style={{ margin: '8px 0', lineHeight: 1.7 }}>{p}</p>)}<p style={{ marginTop: 12 }}>{value.closing}</p><p style={{ fontStyle: 'italic', color: '#888' }}>{value.signature_block}</p></div></div>);
-        continue;
-      }
-      if (key === 'optimized_consent_text') {
-        sections.push(<div key={key} className="ai-result-section"><h3>Optimized Consent Text</h3><div className="notification-template"><h4>Short Version</h4><p style={{ background: '#f0f8ff', padding: 12, borderRadius: 8, lineHeight: 1.7 }}>{value.short_version}</p></div><div className="notification-template" style={{ marginTop: 12 }}><h4>Detailed Version</h4><p style={{ background: '#f0f8ff', padding: 12, borderRadius: 8, lineHeight: 1.7 }}>{value.detailed_version}</p></div>{value.withdrawal_text && (<div className="notification-template" style={{ marginTop: 12 }}><h4>Withdrawal Text</h4><p style={{ background: '#fff8f0', padding: 12, borderRadius: 8, lineHeight: 1.7 }}>{value.withdrawal_text}</p></div>)}</div>);
-        continue;
-      }
-      if (key === 'classification_results' && Array.isArray(value)) {
-        sections.push(<div key={key} className="ai-result-section"><h3>Classification Results</h3>{value.map((c, i) => (<div key={i} className="classification-card"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h4 style={{ margin: 0 }}>{c.field_name}</h4><span className={`badge badge-${c.sensitivity_level === 'restricted' ? 'critical' : c.sensitivity_level === 'confidential' ? 'high' : c.sensitivity_level === 'internal' ? 'medium' : 'active'}`}>{c.sensitivity_level}</span></div><p style={{ color: '#666', fontSize: 13, marginTop: 4 }}>Type: {c.data_type?.replace(/_/g, ' ')} | GDPR: {c.gdpr_category}</p><div className="classification-flags"><span className={`flag flag-${c.pii_flag}`}>PII: {c.pii_flag ? 'Yes' : 'No'}</span><span className={`flag flag-${c.phi_flag}`}>PHI: {c.phi_flag ? 'Yes' : 'No'}</span><span className={`flag flag-${c.pci_flag}`}>PCI: {c.pci_flag ? 'Yes' : 'No'}</span>{c.article_9_data && <span className="flag flag-true">Art. 9</span>}{c.encryption_required && <span className="flag flag-true">Encryption Req.</span>}</div>{c.handling_requirements?.length > 0 && <p style={{ fontSize: 12, marginTop: 6 }}><strong>Handling:</strong> {c.handling_requirements.join(', ')}</p>}</div>))}</div>);
-        continue;
-      }
-      if (key === 'immediate_actions' && Array.isArray(value)) {
-        sections.push(<div key={key} className="ai-result-section"><h3>Immediate Action Plan</h3>{value.map((a, i) => (<div key={i} className="timeline-item"><span className="timeline-step">{a.step || i + 1}</span><div><p style={{ fontWeight: 500 }}>{a.action}</p><p style={{ fontSize: 12, color: '#888' }}>Responsible: {a.responsible} | Deadline: {a.deadline}</p>{a.details && <p style={{ fontSize: 12, color: '#666' }}>{a.details}</p>}</div></div>))}</div>);
-        continue;
-      }
-      if (key === 'recommended_courses' && Array.isArray(value)) {
-        sections.push(<div key={key} className="ai-result-section"><h3>Recommended Courses</h3>{value.map((c, i) => (<div key={i} className="ai-risk-card"><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h4 style={{ margin: 0 }}>{c.course_name}</h4><div style={{ display: 'flex', gap: 6 }}><span className={`badge badge-${c.type === 'mandatory' ? 'critical' : c.type === 'recommended' ? 'medium' : 'active'}`}>{c.type}</span><span className={`badge badge-${c.priority}`}>{c.priority}</span></div></div><p style={{ color: '#666', fontSize: 13, margin: '6px 0' }}>{c.description}</p><p style={{ fontSize: 12, color: '#888' }}>Duration: {c.duration_hours}h | Method: {c.delivery_method} | Frequency: {c.frequency}</p>{c.topics?.length > 0 && <p style={{ fontSize: 12, marginTop: 4 }}><strong>Topics:</strong> {c.topics.join(', ')}</p>}</div>))}</div>);
-        continue;
-      }
-      if (key === 'learning_path' && Array.isArray(value)) {
-        sections.push(<div key={key} className="ai-result-section"><h3>Learning Path</h3>{value.map((p, i) => (<div key={i} className="timeline-item"><span className="timeline-step">{i + 1}</span><div><p style={{ fontWeight: 500 }}>{p.phase}</p><p style={{ fontSize: 12, color: '#888' }}>Duration: {p.duration} | Milestone: {p.milestone}</p><p style={{ fontSize: 12 }}>Courses: {p.courses?.join(', ')}</p></div></div>))}</div>);
-        continue;
-      }
-      if (Array.isArray(value) && value.length > 0) {
-        sections.push(renderArray(value, key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())));
-        continue;
-      }
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        const title = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        const hasArrays = Object.values(value).some(v => Array.isArray(v));
-        if (hasArrays) {
-          const subSections = [];
-          subSections.push(<h3 key={`${key}-title`}>{title}</h3>);
-          for (const [sk, sv] of Object.entries(value)) {
-            if (Array.isArray(sv) && sv.length > 0) {
-              if (typeof sv[0] === 'string') {
-                subSections.push(<div key={sk} style={{ marginBottom: 8 }}><h4>{sk.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h4><ul>{sv.map((item, j) => <li key={j}>{item}</li>)}</ul></div>);
-              } else {
-                subSections.push(renderArray(sv, sk.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())));
-              }
-            } else if (typeof sv !== 'object') {
-              subSections.push(<p key={sk} style={{ fontSize: 13, margin: '4px 0' }}><strong>{sk.replace(/_/g, ' ')}:</strong> {typeof sv === 'boolean' ? (sv ? 'Yes' : 'No') : String(sv)}</p>);
-            }
-          }
-          sections.push(<div key={key} className="ai-result-section">{subSections}</div>);
-        } else {
-          sections.push(renderObject(value, title));
-        }
+      if (aiRequest.current === controller) {
+        aiRequest.current = null;
+        setLoading(false);
       }
     }
-    return sections;
   };
+
+  const cancelAI = () => {
+    if (!aiRequest.current) return;
+    aiRequest.current.abort();
+    aiRequest.current = null;
+    setLoading(false);
+    setAiNotice('OpenRouter request cancelled. Review the inputs or generate again.');
+  };
+
+  const renderGenericResult = (data) => data ? <AIResultView response={data} title={TABS.find(tab => tab.key === activeTab)?.label || 'Privacy AI report'} /> : null;
 
   // ======================== DATA DROPDOWN + SAMPLES ========================
 
@@ -409,9 +289,12 @@ function AIInsights({ aiService, onBack, initialTab }) {
         {source && (
           <div style={{ marginBottom: samples ? 12 : 0 }}>
             <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#6c5ce7', display: 'block', marginBottom: 6 }}>
-              Load from Database ({items.length} records)
+              Load from Database {dbLoading[activeTab] ? '(loading…)' : dbErrors[activeTab] ? '(unavailable)' : `(${items.length} records)`}
             </label>
+            {dbErrors[activeTab] && <div role="alert" style={{ color: '#b91c1c', marginBottom: 8 }}>Saved sources could not load: {dbErrors[activeTab]} <button type="button" className="btn btn-sm" disabled={dbLoading[activeTab]} onClick={() => loadDbData(activeTab, true)}>Retry sources</button></div>}
             <select
+              aria-label="Saved source record"
+              disabled={dbLoading[activeTab] || Boolean(dbErrors[activeTab])}
               style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '2px solid #e0e0e0', fontSize: 14, fontFamily: 'inherit', background: 'white', cursor: 'pointer' }}
               value=""
               onChange={(e) => {
@@ -429,11 +312,12 @@ function AIInsights({ aiService, onBack, initialTab }) {
           </div>
         )}
 
+        {inputOrigin[activeTab] && <p role="status" style={{ margin: '8px 0 12px', fontSize: 13 }}>{inputOrigin[activeTab]}</p>}
         {/* Sample Buttons */}
         {samples && (
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#6c5ce7', display: 'block', marginBottom: 8 }}>
-              Load Sample Data
+              Demo AI · Fill all fields
             </label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {samples.map((sample, i) => (
@@ -444,6 +328,7 @@ function AIInsights({ aiService, onBack, initialTab }) {
                   style={{ background: 'white', border: '2px solid #e0e0e0', color: '#333', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'inherit' }}
                   onMouseOver={e => { e.target.style.borderColor = '#a855f7'; e.target.style.background = '#faf5ff'; }}
                   onMouseOut={e => { e.target.style.borderColor = '#e0e0e0'; e.target.style.background = 'white'; }}
+                  disabled={loading}
                   onClick={() => loadSample(sample)}
                 >
                   {sample.label}
@@ -535,10 +420,16 @@ function AIInsights({ aiService, onBack, initialTab }) {
 
         <form className="ai-form" onSubmit={handleSubmit}>
           {renderForm()}
-          <button type="submit" className="btn btn-primary" style={{ width: 'auto', padding: '12px 32px', marginTop: 16 }} disabled={loading}>
-            {loading ? (<><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Analyzing...</>) : (`🤖 Run ${currentTab?.label || 'AI Analysis'}`)}
-          </button>
+          <div className="ai-actions" style={{ marginTop: 16 }}>
+            <button type="button" className="btn btn-secondary" onClick={cancelAI} disabled={!loading}>Cancel</button>
+            <button type="submit" className="btn btn-primary" style={{ width: 'auto', padding: '12px 32px' }} disabled={loading}>
+              {loading ? (<><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> Generating...</>) : (`Generate ${currentTab?.label || 'report'} with OpenRouter`)}
+            </button>
+          </div>
         </form>
+
+        {aiNotice && <p role="status">{aiNotice}</p>}
+        {aiError && <div role="alert" className="error-msg">OpenRouter request failed: {aiError} <button type="button" className="btn btn-sm" onClick={handleSubmit}>Retry generation</button></div>}
 
         {loading && (
           <div className="loading-spinner"><div className="spinner" /> AI is analyzing your data... This may take a moment.</div>

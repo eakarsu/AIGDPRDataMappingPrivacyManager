@@ -29,7 +29,15 @@ api.interceptors.response.use(
 
 export function createCrudService(endpoint) {
   return {
-    getAll: (search) => api.get(`/${endpoint}${search ? `?search=${search}` : ''}`),
+    getAll: async (search) => {
+      const response = await api.get(`/${endpoint}${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+      const payload = response.data;
+      const rows = Array.isArray(payload) ? payload : payload?.data;
+      if (!Array.isArray(rows)) throw new Error('The source API did not return a record list.');
+      const total = Array.isArray(payload) ? rows.length : Number(payload.total ?? rows.length);
+      if (!Number.isInteger(total) || total < 0) throw new Error('The source API returned an invalid record count.');
+      return { ...response, data: rows, total, pagination: Array.isArray(payload) ? null : { page: payload.page, limit: payload.limit, total, totalPages: payload.totalPages } };
+    },
     getById: (id) => api.get(`/${endpoint}/${id}`),
     create: (data) => api.post(`/${endpoint}`, data),
     update: (id, data) => api.put(`/${endpoint}/${id}`, data),
@@ -43,52 +51,52 @@ export const authService = {
 };
 
 export const aiService = {
-  // General AI Tools
-  riskAssessment: (data) => api.post('/ai/risk-assessment', data),
-  dpiaGenerate: (data) => api.post('/ai/dpia-generate', data),
-  complianceGap: (data) => api.post('/ai/compliance-gap', data),
-  classifyData: (data) => api.post('/ai/classify-data', data),
-  breachResponse: (data) => api.post('/ai/breach-response', data),
-  generatePolicy: (data) => api.post('/ai/generate-policy', data),
+  // Every OpenRouter request accepts an AbortSignal through axios config.
+  riskAssessment: (data, config) => api.post('/ai/risk-assessment', data, config),
+  dpiaGenerate: (data, config) => api.post('/ai/dpia-generate', data, config),
+  complianceGap: (data, config) => api.post('/ai/compliance-gap', data, config),
+  classifyData: (data, config) => api.post('/ai/classify-data', data, config),
+  breachResponse: (data, config) => api.post('/ai/breach-response', data, config),
+  generatePolicy: (data, config) => api.post('/ai/generate-policy', data, config),
   // Feature-Specific AI Tools
-  analyzeActivity: (data) => api.post('/ai/analyze-activity', data),
-  draftDsrResponse: (data) => api.post('/ai/draft-dsr-response', data),
-  dpiaAdvice: (data) => api.post('/ai/dpia-advice', data),
-  optimizeConsent: (data) => api.post('/ai/optimize-consent', data),
-  analyzeBreach: (data) => api.post('/ai/analyze-breach', data),
-  assessVendor: (data) => api.post('/ai/assess-vendor', data),
-  retentionAdvice: (data) => api.post('/ai/retention-advice', data),
-  auditCookies: (data) => api.post('/ai/audit-cookies', data),
-  evaluateTransfer: (data) => api.post('/ai/evaluate-transfer', data),
-  recommendTraining: (data) => api.post('/ai/recommend-training', data),
+  analyzeActivity: (data, config) => api.post('/ai/analyze-activity', data, config),
+  draftDsrResponse: (data, config) => api.post('/ai/draft-dsr-response', data, config),
+  dpiaAdvice: (data, config) => api.post('/ai/dpia-advice', data, config),
+  optimizeConsent: (data, config) => api.post('/ai/optimize-consent', data, config),
+  analyzeBreach: (data, config) => api.post('/ai/analyze-breach', data, config),
+  assessVendor: (data, config) => api.post('/ai/assess-vendor', data, config),
+  retentionAdvice: (data, config) => api.post('/ai/retention-advice', data, config),
+  auditCookies: (data, config) => api.post('/ai/audit-cookies', data, config),
+  evaluateTransfer: (data, config) => api.post('/ai/evaluate-transfer', data, config),
+  recommendTraining: (data, config) => api.post('/ai/recommend-training', data, config),
   // New AI Tools (audit-third-party-code & recommendation-engine-bias-check)
-  auditThirdPartyCode: (data) => api.post('/ai/audit-third-party-code', data),
-  checkRecommendationBias: (data) => api.post('/ai/recommendation-engine-bias-check', data),
+  auditThirdPartyCode: (data, config) => api.post('/ai/audit-third-party-code', data, config),
+  checkRecommendationBias: (data, config) => api.post('/ai/recommendation-engine-bias-check', data, config),
   // Apply pass 4 - mechanical backlog
-  dsrFulfillmentPlan: (data) => api.post('/ai/dsr-fulfillment-plan', data),
-  dpaTemplateGenerate: (data) => api.post('/ai/dpa-template-generate', data),
-  piiRbacRecommend: (data) => api.post('/ai/pii-rbac-recommend', data),
+  dsrFulfillmentPlan: (data, config) => api.post('/ai/dsr-fulfillment-plan', data, config),
+  dpaTemplateGenerate: (data, config) => api.post('/ai/dpa-template-generate', data, config),
+  piiRbacRecommend: (data, config) => api.post('/ai/pii-rbac-recommend', data, config),
 };
 
 // Custom non-CRUD feature endpoints (5 new per audit)
 export const customService = {
   // 1. Cookie scanner
-  cookieScannerScan: (data) => api.post('/cookie-scanner/scan', data),
+  cookieScannerScan: (data, config) => api.post('/cookie-scanner/scan', data, config),
   cookieScannerHistory: (params) => api.get('/cookie-scanner/history', { params }),
   // 2. DSR fulfillment
-  dsrFulfillmentGenerate: (data) => api.post('/dsr-fulfillment/generate', data),
+  dsrFulfillmentGenerate: (data, config) => api.post('/dsr-fulfillment/generate', data, config),
   dsrFulfillmentList: (params) => api.get('/dsr-fulfillment/dossiers', { params }),
   // 3. Breach 72h countdown
-  breachCountdownRegister: (data) => api.post('/breach-countdown/register', data),
+  breachCountdownRegister: (data, config) => api.post('/breach-countdown/register', data, config),
   breachCountdownList: () => api.get('/breach-countdown'),
   // 4. Vendor renewal/audit calendar
   vendorCalendarSync: () => api.post('/vendor-calendar/sync'),
-  vendorCalendarRecommend: (data) => api.post('/vendor-calendar/recommend', data),
+  vendorCalendarRecommend: (data, config) => api.post('/vendor-calendar/recommend', data, config),
   vendorCalendarList: () => api.get('/vendor-calendar'),
   // 5. Policy corpus RAG
   policyCorpusUpload: (data) => api.post('/policy-corpus', data),
   policyCorpusList: (params) => api.get('/policy-corpus', { params }),
-  policyCorpusQuery: (data) => api.post('/policy-corpus/query', data),
+  policyCorpusQuery: (data, config) => api.post('/policy-corpus/query', data, config),
   // Misc
   aiHistory: (params) => api.get('/ai-history', { params }),
   auditLog: (params) => api.get('/audit-log', { params }),

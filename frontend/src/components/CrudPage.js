@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 
 function formatValue(val) {
@@ -34,25 +34,26 @@ function CrudPage({ feature, fieldConfig, service, onBack }) {
   const [formData, setFormData] = useState({});
   const [showConfirm, setShowConfirm] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const loadRequest = useRef(0);
 
   const loadItems = useCallback(async () => {
+    const request = ++loadRequest.current;
+    setLoading(true); setLoadError('');
     try {
-      const res = await service.getAll(search);
-      setItems(res.data);
-    } catch (err) {
-      toast.error('Failed to load data');
+      const response = await service.getAll(search);
+      if (!Array.isArray(response.data)) throw new Error('The source API did not return a record list.');
+      if (request === loadRequest.current) setItems(response.data);
+    } catch (error) {
+      if (request === loadRequest.current) setLoadError(error.response?.data?.error || error.message || 'Saved records could not load.');
     } finally {
-      setLoading(false);
+      if (request === loadRequest.current) setLoading(false);
     }
   }, [service, search]);
 
   useEffect(() => {
-    loadItems();
-  }, [loadItems]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => { loadItems(); }, 300);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(loadItems, search ? 250 : 0);
+    return () => { clearTimeout(timer); loadRequest.current++; };
   }, [search, loadItems]);
 
   const openNew = () => {
@@ -116,6 +117,7 @@ function CrudPage({ feature, fieldConfig, service, onBack }) {
     <div>
       <button className="btn-back" onClick={onBack}>← Back to Dashboard</button>
 
+      {loadError && <div role="alert" className="error-msg">Saved records could not load: {loadError} {items.length > 0 && 'The displayed rows are from the previous successful load.'} <button type="button" className="btn btn-sm" onClick={loadItems}>Retry records</button></div>}
       <div className="page-header">
         <h1>{feature.icon} {feature.title}</h1>
         <div className="page-header-actions">
@@ -146,7 +148,7 @@ function CrudPage({ feature, fieldConfig, service, onBack }) {
                 <tr><td colSpan={tableColumns.length} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No records found</td></tr>
               ) : (
                 items.map(item => (
-                  <tr key={item.id} onClick={() => setSelectedItem(item)}>
+                  <tr key={item.id} onClick={() => setSelectedItem(item)} tabIndex={0} onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && event.target === event.currentTarget) { event.preventDefault(); (() => setSelectedItem(item))(event); } }}>
                     {tableColumns.map(col => (
                       <td key={col}>
                         {BADGE_FIELDS.includes(col) && item[col] ? (
@@ -167,7 +169,7 @@ function CrudPage({ feature, fieldConfig, service, onBack }) {
       {/* Detail Modal */}
       {selectedItem && (
         <div className="modal-overlay" onClick={() => setSelectedItem(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal modal-record-details" role="dialog" aria-modal="true" aria-label={`${feature.title} record details`} onClick={e => e.stopPropagation()}>
             <h2>{feature.icon} Record Details</h2>
             <div className="detail-grid">
               {Object.entries(selectedItem).filter(([k]) => k !== 'id' && k !== 'created_at' && k !== 'updated_at').map(([key, val]) => (
@@ -182,9 +184,9 @@ function CrudPage({ feature, fieldConfig, service, onBack }) {
               ))}
             </div>
             <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setSelectedItem(null)}>Close</button>
-              <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => openEdit(selectedItem)}>Edit</button>
-              <button className="btn btn-danger" onClick={() => setShowConfirm(selectedItem.id)}>Delete</button>
+              <button className="btn btn-secondary" type="button" onClick={() => setSelectedItem(null)}>Cancel</button>
+              <button className="btn btn-primary" type="button" style={{ width: 'auto' }} onClick={() => openEdit(selectedItem)}>Edit</button>
+              <button className="btn btn-danger" type="button" onClick={() => setShowConfirm(selectedItem.id)}>Delete</button>
             </div>
           </div>
         </div>

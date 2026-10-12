@@ -25,29 +25,37 @@ const AI_FEATURE_SPECIFIC = [
 
 function Dashboard({ features, onNavigate }) {
   const [counts, setCounts] = useState({});
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setErrors({});
     const loadCounts = async () => {
-      const results = {};
-      const entries = Object.entries(features);
-      const promises = entries.map(async ([key, feat]) => {
+      const results = {}, failures = {};
+      await Promise.all(Object.entries(features).map(async ([key, feat]) => {
         try {
-          const res = await createCrudService(feat.endpoint).getAll();
-          results[key] = res.data.length;
-        } catch {
-          results[key] = 0;
+          const response = await createCrudService(feat.endpoint).getAll();
+          const total = response.total ?? response.data.length;
+          if (!Number.isInteger(total) || total < 0) throw new Error('The source API returned an invalid record count.');
+          results[key] = total;
+        } catch (error) {
+          failures[key] = error.response?.data?.error || error.message || 'Saved records could not load.';
         }
-      });
-      await Promise.allSettled(promises);
-      setCounts(results);
+      }));
+      if (active) { setCounts(results); setErrors(failures); setLoading(false); }
     };
     loadCounts();
-  }, [features]);
+    return () => { active = false; };
+  }, [features, revision]);
 
-  const totalRecords = Object.values(counts).reduce((a, b) => a + b, 0);
-  const breachCount = counts['data-breaches'] || 0;
-  const pendingDSRs = counts['data-subject-requests'] || 0;
-  const vendorCount = counts['vendors'] || 0;
+  const totalRecords = loading ? 'Loading…' : Object.keys(errors).length ? 'Unavailable' : Object.values(counts).reduce((sum, count) => sum + count, 0);
+  const countFor = key => loading ? 'Loading…' : counts[key] ?? 'Unavailable';
+  const breachCount = countFor('data-breaches');
+  const pendingDSRs = countFor('data-subject-requests');
+  const vendorCount = countFor('vendors');
 
   return (
     <div>
@@ -56,6 +64,7 @@ function Dashboard({ features, onNavigate }) {
         <p>AI-powered GDPR compliance management overview</p>
       </div>
 
+      {Object.keys(errors).length > 0 && <div role="alert" className="error-msg">Saved record counts are unavailable for {Object.keys(errors).map(key => features[key].title).join(', ')}. {Object.values(errors).join(' ')} <button type="button" className="btn btn-sm" onClick={() => setRevision(value => value + 1)}>Retry counts</button></div>}
       <div className="dashboard-stats">
         <div className="stat-card">
           <div className="stat-card-value" style={{ color: '#6c5ce7' }}>{totalRecords}</div>
@@ -85,7 +94,7 @@ function Dashboard({ features, onNavigate }) {
             <h3>{feat.title}</h3>
             <p>Manage and track {feat.title.toLowerCase()} records</p>
             <div className="feature-card-count" style={{ background: `${feat.color}15`, color: feat.color }}>
-              {counts[key] !== undefined ? `${counts[key]} records` : 'Loading...'}
+              {loading ? 'Loading…' : errors[key] ? 'Unavailable' : `${counts[key]} records`}
             </div>
           </div>
         ))}

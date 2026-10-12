@@ -1,26 +1,40 @@
 const express = require('express');
-
+const { query } = require('../db');
 const router = express.Router();
 
-function buildQueue(input = {}) {
-  const transfers = input.transfers || [
-    { name: 'EU analytics export', destination_country: 'United States', mechanism: 'SCC', tia_completed: false, encryption: true, vendor_risk: 'medium' },
-    { name: 'Support ticket replication', destination_country: 'India', mechanism: 'SCC', tia_completed: true, encryption: true, vendor_risk: 'low' },
-    { name: 'HR processor backup', destination_country: 'Singapore', mechanism: 'adequacy', tia_completed: false, encryption: false, vendor_risk: 'high' },
-  ];
-  const queue = transfers.map((t) => {
-    const score = (t.tia_completed ? 0 : 35) + (t.encryption ? 0 : 25) + (t.vendor_risk === 'high' ? 25 : t.vendor_risk === 'medium' ? 12 : 4) + (t.mechanism === 'adequacy' ? -10 : 8);
-    return {
-      ...t,
-      risk_score: Math.max(0, Math.min(100, score)),
-      priority: score >= 60 ? 'legal_review' : score >= 35 ? 'privacy_ops_review' : 'monitor',
-      required_artifacts: ['TIA questionnaire', 'SCC attachment', 'supplementary safeguards memo'].filter((_, i) => score > i * 20),
-    };
-  }).sort((a, b) => b.risk_score - a.risk_score);
-  return { queue, summary: { total: queue.length, legal_review: queue.filter((q) => q.priority === 'legal_review').length } };
+// Deterministic planning priority over saved native transfer facts. This does
+// not verify a transfer, complete a TIA, approve a mechanism or call a provider.
+function buildQueue(transfers) {
+  return transfers.map(t => {
+    const name = t.transfer_name ?? t.name;
+    const mechanism = t.transfer_mechanism ?? t.mechanism;
+    const encryption = 'encryption_in_transit' in t ? t.encryption_in_transit === true && t.encryption_at_rest === true : t.encryption === true;
+    const recordedRisk = t.risk_level ?? t.vendor_risk;
+    const score = (t.tia_completed === true ? 0 : 35) + (encryption ? 0 : 25) + (recordedRisk === 'high' || recordedRisk === 'critical' ? 25 : recordedRisk === 'medium' ? 12 : 4) + (String(mechanism || '').toLowerCase() === 'adequacy' ? -10 : 8);
+    const required_artifacts = [];
+    if (t.tia_completed !== true) required_artifacts.push('Review the actual TIA documentation');
+    if (!encryption) required_artifacts.push('Verify the recorded supplementary safeguards');
+    if (String(mechanism || '').toLowerCase().includes('scc')) required_artifacts.push('Review the actual SCC attachment');
+    if (!mechanism) required_artifacts.push('Verify the actual transfer mechanism');
+    if (['high','critical'].includes(recordedRisk)) required_artifacts.push('Request authorized legal review');
+    return { ...t, name, mechanism, risk_score: Math.max(0,Math.min(100,score)), priority:score >= 60 ? 'legal_review' : score >= 35 ? 'privacy_ops_review' : 'monitor', required_artifacts, heuristic:true };
+  }).sort((a,b)=>b.risk_score-a.risk_score || Number(a.id || 0)-Number(b.id || 0));
 }
-
-router.get('/', (req, res) => res.json(buildQueue()));
-router.post('/prioritize', (req, res) => res.json(buildQueue(req.body || {})));
-
+function result(transfers, source) {
+  const queue = buildQueue(transfers);
+  return {queue,source,heuristic:true,summary:{total:queue.length,legal_review:queue.filter(item=>item.priority==='legal_review').length}};
+}
+router.get('/', async (req,res) => {
+  try {
+    const actor = await query('SELECT id FROM users WHERE id=$1',[req.user.id]);
+    if (!actor.rowCount) return res.status(401).json({error:'Sign in again to load saved transfers.'});
+    const transfers = await query('SELECT * FROM cross_border_transfers ORDER BY id');
+    res.json(result(transfers.rows,'PostgreSQL · Saved native cross-border transfers'));
+  } catch (_) { res.status(500).json({error:'Saved transfer records could not load. Retry shortly.'}); }
+});
+router.post('/prioritize', (req,res) => {
+  const transfers = req.body?.transfers;
+  if (!Array.isArray(transfers) || transfers.length > 1000 || transfers.some(item=>!item || typeof item!=='object' || Array.isArray(item))) return res.status(400).json({error:'Provide the actual transfer list to prioritize; no example records are substituted.'});
+  res.json(result(transfers,'Supplied planning input · Not saved or verified'));
+});
 module.exports = router;
