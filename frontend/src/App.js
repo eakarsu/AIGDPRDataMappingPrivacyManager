@@ -8,6 +8,7 @@ import CrudPage from './components/CrudPage';
 import AIInsights from './components/AIInsights';
 import AIAdvancedTools from './components/AIAdvancedTools';
 import CustomFeatures from './components/CustomFeatures';
+import TasksPage from './pages/TasksPage';
 import RegulatoryAndLLM from './components/RegulatoryAndLLM';
 
 // === Batch 04 Gaps & Frontend Mounts ===
@@ -348,6 +349,7 @@ function App() {
           <div className={`sidebar-item ${currentPage === 'dashboard' ? 'active' : ''}`} onClick={() => navigate('dashboard')}>
             📊 Dashboard
           </div>
+          <div className={`sidebar-item ${currentPage === 'tasks' ? 'active' : ''}`} onClick={() => navigate('tasks')}>Tasks</div>
         </div>
 
         <div className="sidebar-section">
@@ -478,6 +480,7 @@ function App() {
       <AIReportLibrary /></aside>
 
       <main className="main-content">
+        {currentPage === 'tasks' && (<TasksPage />)}
         {currentPage === 'dashboard' && (
           <Dashboard features={FEATURES} onNavigate={navigate} />
         )}

@@ -16,6 +16,9 @@ router.get('/', async (req, res) => {
       whereClause = ' WHERE activity_name ILIKE $1 OR purpose ILIKE $1 OR department ILIKE $1';
       params = [`%${search}%`];
     }
+    for (const [k,col] of [['status','status'],['risk_level','risk_level'],['department','department']]) {
+      if (req.query[k]) { params.push(req.query[k]); whereClause += `${whereClause?' AND':' WHERE'} ${col} = $${params.length}`; }
+    }
 
     const [countRes, dataRes] = await Promise.all([
       query(`SELECT COUNT(*) FROM processing_activities${whereClause}`, params),
@@ -28,6 +31,15 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/export', async (req, res) => {
+  try {
+    const rowsRes = await query('SELECT * FROM processing_activities ORDER BY created_at DESC LIMIT 500');
+    const {filterRecords,toCsv}=require('../domain/taskPolicy');
+    const rows=filterRecords(rowsRes.rows, req.query||{});
+    if (String(req.query.format||'json').toLowerCase()==='csv') { res.setHeader('Content-Type','text/csv'); res.setHeader('Content-Disposition','attachment; filename="processing-activities.csv"'); return res.send(toCsv(rows)); }
+    res.json({exported_at:new Date().toISOString(),count:rows.length,records:rows});
+  } catch(err){ res.status(500).json({error:err.message}); }
+});
 router.get('/:id', async (req, res) => {
   try {
     const result = await query('SELECT * FROM processing_activities WHERE id = $1', [req.params.id]);

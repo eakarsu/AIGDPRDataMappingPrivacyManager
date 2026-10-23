@@ -609,6 +609,7 @@ app.post('/api/policy-corpus/query', authMiddleware, aiLimiter, async (req, res)
 app.use('/api/auth', require('./routes/auth'));
 // Secure processing activities GET (was unauthenticated)
 app.use('/api/processing-activities', authMiddleware, require('./routes/processingActivities'));
+app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/data-subject-requests', authMiddleware, require('./routes/dataSubjectRequests'));
 app.use('/api/privacy-impact-assessments', authMiddleware, require('./routes/privacyImpactAssessments'));
 app.use('/api/consent-records', authMiddleware, require('./routes/consentRecords'));
